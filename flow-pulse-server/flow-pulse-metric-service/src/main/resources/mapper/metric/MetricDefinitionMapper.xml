@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.metric.infrastructure.persistence.mapper.MetricDefinitionMapper">
+    <resultMap id="MetricDefinitionMap" type="com.flowpulse.metric.domain.model.MetricDefinitionEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="metricCode" column="metric_code"/>
+        <result property="metricName" column="metric_name"/>
+        <result property="metricCategory" column="metric_category"/>
+        <result property="objectType" column="object_type"/>
+        <result property="valueUnit" column="value_unit"/>
+        <result property="valuePrecision" column="value_precision"/>
+        <result property="mappingJson" column="mapping_json"/>
+        <result property="enabled" column="enabled"/>
+        <result property="implementationCount" column="implementation_count"/>
+        <result property="description" column="description"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="PageWhere">
+        where d.tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            and (lower(d.metric_code) like concat('%', lower(#{keyword}), '%')
+             or lower(d.metric_name) like concat('%', lower(#{keyword}), '%'))
+        </if>
+        <if test="metricCategory != null and metricCategory != ''">and d.metric_category = #{metricCategory}</if>
+        <if test="objectType != null and objectType != ''">and d.object_type = #{objectType}</if>
+        <if test="enabled != null">and d.enabled = #{enabled}</if>
+    </sql>
+
+    <select id="selectPage" resultMap="MetricDefinitionMap">
+        select d.*,
+               (select count(1) from fp_metric_implementation i where i.tenant_id = d.tenant_id and i.metric_definition_id = d.id) as implementation_count
+        from fp_metric_definition d
+        <include refid="PageWhere"/>
+        order by d.created_at desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(1) from fp_metric_definition d
+        <include refid="PageWhere"/>
+    </select>
+
+    <select id="countAll" resultType="long">
+        select count(1) from fp_metric_definition where tenant_id = #{tenantId}
+    </select>
+
+    <select id="countEnabled" resultType="long">
+        select count(1) from fp_metric_definition where tenant_id = #{tenantId} and enabled = true
+    </select>
+
+    <select id="countMapped" resultType="long">
+        select count(1) from fp_metric_definition
+        where tenant_id = #{tenantId} and mapping_json is not null and mapping_json != ''
+    </select>
+
+    <select id="countObjectTypes" resultType="long">
+        select count(distinct object_type) from fp_metric_definition where tenant_id = #{tenantId}
+    </select>
+
+    <select id="selectById" resultMap="MetricDefinitionMap">
+        select d.*,
+               (select count(1) from fp_metric_implementation i where i.tenant_id = d.tenant_id and i.metric_definition_id = d.id) as implementation_count
+        from fp_metric_definition d where d.tenant_id = #{tenantId} and d.id = #{id}
+    </select>
+
+    <select id="selectByCode" resultMap="MetricDefinitionMap">
+        select d.*,
+               (select count(1) from fp_metric_implementation i where i.tenant_id = d.tenant_id and i.metric_definition_id = d.id) as implementation_count
+        from fp_metric_definition d where d.tenant_id = #{tenantId} and d.metric_code = #{metricCode}
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.metric.domain.model.MetricDefinitionEntity">
+        insert into fp_metric_definition
+        (id, tenant_id, metric_code, metric_name, metric_category, object_type,
+         value_unit, value_precision, mapping_json, enabled, description, created_at, updated_at)
+        values
+        (#{id}, #{tenantId}, #{metricCode}, #{metricName}, #{metricCategory}, #{objectType},
+         #{valueUnit}, #{valuePrecision}, #{mappingJson}, #{enabled}, #{description}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.metric.domain.model.MetricDefinitionEntity">
+        update fp_metric_definition
+        set metric_code = #{metricCode}, metric_name = #{metricName}, metric_category = #{metricCategory},
+            object_type = #{objectType}, value_unit = #{valueUnit}, value_precision = #{valuePrecision},
+            mapping_json = #{mappingJson}, enabled = #{enabled}, description = #{description}, updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from fp_metric_definition where tenant_id = #{tenantId} and id = #{id}
+    </delete>
+</mapper>

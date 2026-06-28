@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.executor.infrastructure.persistence.mapper.ExecutorNodeMapper">
+    <resultMap id="ExecutorNodeMap" type="com.flowpulse.executor.domain.model.ExecutorNodeEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="envId" column="env_id"/>
+        <result property="regionId" column="region_id"/>
+        <result property="host" column="host"/>
+        <result property="sshPort" column="ssh_port"/>
+        <result property="sshUsername" column="ssh_username"/>
+        <result property="sshPassword" column="ssh_password"/>
+        <result property="sshAuthType" column="ssh_auth_type"/>
+        <result property="sshPrivateKey" column="ssh_private_key"/>
+        <result property="javaHome" column="java_home"/>
+        <result property="pythonPath" column="python_path"/>
+        <result property="sourceType" column="source_type"/>
+        <result property="sshSupported" column="ssh_supported"/>
+        <result property="agentSupported" column="agent_supported"/>
+        <result property="agentStatus" column="agent_status"/>
+        <result property="connectionStatus" column="connection_status"/>
+        <result property="lastTestMessage" column="last_test_message"/>
+        <result property="lastTestAt" column="last_test_at"/>
+        <result property="lastSyncAt" column="last_sync_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="PageWhere">
+        where tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            and lower(host) like concat('%', lower(#{keyword}), '%')
+        </if>
+        <if test="envId != null and envId != ''">
+            and env_id = #{envId}
+        </if>
+        <if test="regionId != null and regionId != ''">
+            and region_id = #{regionId}
+        </if>
+        <if test="sourceType != null and sourceType != ''">
+            and source_type = #{sourceType}
+        </if>
+        <if test="connectionStatus != null and connectionStatus != ''">
+            and connection_status = #{connectionStatus}
+        </if>
+    </sql>
+
+    <select id="selectPage" resultMap="ExecutorNodeMap">
+        select * from fp_executor_node
+        <include refid="PageWhere"/>
+        order by created_at desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(1) from fp_executor_node
+        <include refid="PageWhere"/>
+    </select>
+
+    <select id="countAll" resultType="long">
+        select count(1) from fp_executor_node where tenant_id = #{tenantId}
+    </select>
+
+    <select id="countBySshSupported" resultType="long">
+        select count(1) from fp_executor_node where tenant_id = #{tenantId} and ssh_supported = true
+    </select>
+
+    <select id="countByAgentSupported" resultType="long">
+        select count(1) from fp_executor_node where tenant_id = #{tenantId} and agent_supported = true
+    </select>
+
+    <select id="countBySourceType" resultType="long">
+        select count(1) from fp_executor_node where tenant_id = #{tenantId} and source_type = #{sourceType}
+    </select>
+
+    <select id="selectById" resultMap="ExecutorNodeMap">
+        select * from fp_executor_node where tenant_id = #{tenantId} and id = #{id}
+    </select>
+
+    <select id="selectByHost" resultMap="ExecutorNodeMap">
+        select * from fp_executor_node
+        where tenant_id = #{tenantId} and env_id = #{envId} and region_id = #{regionId} and host = #{host}
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.executor.domain.model.ExecutorNodeEntity">
+        insert into fp_executor_node
+        (id, tenant_id, env_id, region_id, host, ssh_port, ssh_username, ssh_password, ssh_auth_type,
+         ssh_private_key, java_home, python_path, source_type, ssh_supported, agent_supported, agent_status, connection_status,
+         last_test_message, last_test_at, last_sync_at, created_at, updated_at)
+        values
+        (#{id}, #{tenantId}, #{envId}, #{regionId}, #{host}, #{sshPort}, #{sshUsername}, #{sshPassword}, #{sshAuthType},
+         #{sshPrivateKey}, #{javaHome}, #{pythonPath}, #{sourceType}, #{sshSupported}, #{agentSupported}, #{agentStatus}, #{connectionStatus},
+         #{lastTestMessage}, #{lastTestAt}, #{lastSyncAt}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.executor.domain.model.ExecutorNodeEntity">
+        update fp_executor_node
+        set env_id = #{envId}, region_id = #{regionId}, host = #{host}, ssh_port = #{sshPort},
+            ssh_username = #{sshUsername}, ssh_password = #{sshPassword}, ssh_auth_type = #{sshAuthType},
+            ssh_private_key = #{sshPrivateKey}, java_home = #{javaHome}, python_path = #{pythonPath},
+            source_type = #{sourceType}, ssh_supported = #{sshSupported},
+            agent_supported = #{agentSupported}, agent_status = #{agentStatus}, connection_status = #{connectionStatus},
+            last_test_message = #{lastTestMessage}, last_test_at = #{lastTestAt}, last_sync_at = #{lastSyncAt},
+            updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from fp_executor_node where tenant_id = #{tenantId} and id = #{id}
+    </delete>
+</mapper>

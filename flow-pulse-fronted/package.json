@@ -1,0 +1,35 @@
+{
+  "name": "flow-pulse-fronted",
+  "version": "1.0.0",
+  "description": "FlowPulse 数据流可观测平台前端",
+  "homepage": "/flowpulse",
+  "private": true,
+  "scripts": {
+    "check:encoding": "node ../tools/check-text-integrity.mjs",
+    "prebuild": "npm run check:encoding",
+    "start": "everest start",
+    "build": "everest build",
+    "serve": "everest serve build -o"
+  },
+  "dependencies": {
+    "@uyun/components": "^5.2.0",
+    "@uyun/icons": "^1.2.0",
+    "@uyun/layout": "^5.0.10",
+    "mobx": "^6.12.0",
+    "mobx-react-lite": "^4.0.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.0",
+    "@babel/plugin-proposal-class-properties": "^7.18.6",
+    "@babel/plugin-proposal-decorators": "^7.22.0",
+    "@babel/preset-env": "^7.22.0",
+    "@babel/preset-react": "^7.22.0",
+    "@uyun/cli": "^2.2.6",
+    "@uyun/polyfills": "^1.4.13-alpha.0",
+    "@uyun/runtime": "1.8.5",
+    "@uyun/runtime-react": "1.8.5",
+    "react": "^16.14.0",
+    "react-dom": "^16.14.0",
+    "react-router-dom": "^5.2.0"
+  }
+}

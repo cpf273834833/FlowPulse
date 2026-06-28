@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.management.infrastructure.persistence.mapper.PlatformConfigMapper">
+    <resultMap id="PlatformConfigMap" type="com.flowpulse.management.domain.model.PlatformConfigEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="envId" column="env_id"/>
+        <result property="regionId" column="region_id"/>
+        <result property="name" column="name"/>
+        <result property="platformBaseUrl" column="platform_base_url"/>
+        <result property="ompBaseUrl" column="omp_base_url"/>
+        <result property="platformAuthType" column="platform_auth_type"/>
+        <result property="platformApiKey" column="platform_api_key"/>
+        <result property="ompAuthType" column="omp_auth_type"/>
+        <result property="ompApiKey" column="omp_api_key"/>
+        <result property="syncEnabled" column="sync_enabled"/>
+        <result property="syncIntervalSec" column="sync_interval_sec"/>
+        <result property="platformConnectionStatus" column="platform_connection_status"/>
+        <result property="ompConnectionStatus" column="omp_connection_status"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="PlatformConfigMap">
+        select * from fp_platform_config where tenant_id = #{tenantId} order by created_at desc
+    </select>
+
+    <select id="selectById" resultMap="PlatformConfigMap">
+        select * from fp_platform_config where tenant_id = #{tenantId} and id = #{id}
+    </select>
+
+    <select id="selectByRegionId" resultMap="PlatformConfigMap">
+        select * from fp_platform_config where tenant_id = #{tenantId} and region_id = #{regionId}
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.management.domain.model.PlatformConfigEntity">
+        insert into fp_platform_config
+        (id, tenant_id, env_id, region_id, name, platform_base_url, omp_base_url, platform_auth_type,
+         platform_api_key, omp_auth_type, omp_api_key, sync_enabled, sync_interval_sec,
+         platform_connection_status, omp_connection_status, status, created_at, updated_at)
+        values
+        (#{id}, #{tenantId}, #{envId}, #{regionId}, #{name}, #{platformBaseUrl}, #{ompBaseUrl}, #{platformAuthType},
+         #{platformApiKey}, #{ompAuthType}, #{ompApiKey}, #{syncEnabled}, #{syncIntervalSec},
+         #{platformConnectionStatus}, #{ompConnectionStatus}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.management.domain.model.PlatformConfigEntity">
+        update fp_platform_config
+        set name = #{name}, platform_base_url = #{platformBaseUrl}, omp_base_url = #{ompBaseUrl},
+            platform_auth_type = #{platformAuthType}, platform_api_key = #{platformApiKey},
+            omp_auth_type = #{ompAuthType}, omp_api_key = #{ompApiKey},
+            sync_enabled = #{syncEnabled}, sync_interval_sec = #{syncIntervalSec},
+            platform_connection_status = #{platformConnectionStatus}, omp_connection_status = #{ompConnectionStatus},
+            status = #{status}, updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from fp_platform_config where tenant_id = #{tenantId} and id = #{id}
+    </delete>
+</mapper>

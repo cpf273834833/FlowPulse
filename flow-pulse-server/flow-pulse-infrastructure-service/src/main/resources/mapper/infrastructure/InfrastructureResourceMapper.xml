@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.infrastructure.infrastructure.persistence.mapper.InfrastructureResourceMapper">
+    <resultMap id="ResourceMap" type="com.flowpulse.infrastructure.domain.model.InfrastructureResourceEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="infrastructureId" column="infrastructure_id"/>
+        <result property="resourceType" column="resource_type"/>
+        <result property="resourceName" column="resource_name"/>
+        <result property="resourceCode" column="resource_code"/>
+        <result property="status" column="status"/>
+        <result property="metadataJson" column="metadata_json"/>
+        <result property="lastSyncAt" column="last_sync_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="ResourceWhere">
+        tenant_id = #{tenantId} and infrastructure_id = #{infrastructureId}
+        <if test="keyword != null and keyword != ''">
+            and (lower(resource_name) like concat('%', lower(#{keyword}), '%')
+             or lower(resource_code) like concat('%', lower(#{keyword}), '%'))
+        </if>
+        <if test="resourceType != null and resourceType != ''">and resource_type = #{resourceType}</if>
+    </sql>
+
+    <select id="selectPage" resultMap="ResourceMap">
+        select * from fp_infrastructure_resource
+        where <include refid="ResourceWhere"/>
+        order by resource_type asc, resource_name asc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(1) from fp_infrastructure_resource where <include refid="ResourceWhere"/>
+    </select>
+
+    <select id="countByInfrastructureId" resultType="int">
+        select count(1) from fp_infrastructure_resource where tenant_id = #{tenantId} and infrastructure_id = #{infrastructureId}
+    </select>
+
+    <delete id="deleteByInfrastructureId">
+        delete from fp_infrastructure_resource where tenant_id = #{tenantId} and infrastructure_id = #{infrastructureId}
+    </delete>
+
+    <delete id="deleteNotSyncedAt">
+        delete from fp_infrastructure_resource
+        where tenant_id = #{tenantId}
+          and infrastructure_id = #{infrastructureId}
+          and last_sync_at != #{lastSyncAt}
+    </delete>
+
+    <insert id="upsert" parameterType="com.flowpulse.infrastructure.domain.model.InfrastructureResourceEntity">
+        merge into fp_infrastructure_resource
+        (id, tenant_id, infrastructure_id, resource_type, resource_name, resource_code, status, metadata_json, last_sync_at, created_at, updated_at)
+        key(tenant_id, infrastructure_id, resource_type, resource_code)
+        values
+        (#{id}, #{tenantId}, #{infrastructureId}, #{resourceType}, #{resourceName}, #{resourceCode}, #{status},
+         #{metadataJson}, #{lastSyncAt}, #{createdAt}, #{updatedAt})
+    </insert>
+</mapper>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.infrastructure.infrastructure.persistence.mapper.InfrastructureMapper">
+    <resultMap id="InfrastructureMap" type="com.flowpulse.infrastructure.domain.model.InfrastructureEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="type" column="type"/>
+        <result property="code" column="code"/>
+        <result property="name" column="name"/>
+        <result property="envId" column="env_id"/>
+        <result property="regionId" column="region_id"/>
+        <result property="endpoint" column="endpoint"/>
+        <result property="authType" column="auth_type"/>
+        <result property="username" column="username"/>
+        <result property="password" column="password"/>
+        <result property="apiKey" column="api_key"/>
+        <result property="syncScope" column="sync_scope"/>
+        <result property="syncMode" column="sync_mode"/>
+        <result property="syncEnabled" column="sync_enabled"/>
+        <result property="syncIntervalSec" column="sync_interval_sec"/>
+        <result property="runStatus" column="run_status"/>
+        <result property="connectionStatus" column="connection_status"/>
+        <result property="lastTestMessage" column="last_test_message"/>
+        <result property="lastTestAt" column="last_test_at"/>
+        <result property="lastSyncAt" column="last_sync_at"/>
+        <result property="lastSyncMessage" column="last_sync_message"/>
+        <result property="description" column="description"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="QueryWhere">
+        tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            and (lower(name) like concat('%', lower(#{keyword}), '%')
+             or lower(code) like concat('%', lower(#{keyword}), '%')
+             or lower(endpoint) like concat('%', lower(#{keyword}), '%'))
+        </if>
+        <if test="type != null and type != ''">and type = #{type}</if>
+        <if test="envId != null and envId != ''">and env_id = #{envId}</if>
+        <if test="regionId != null and regionId != ''">and region_id = #{regionId}</if>
+        <if test="status != null and status != ''">and connection_status = #{status}</if>
+    </sql>
+
+    <select id="selectPage" resultMap="InfrastructureMap">
+        select * from fp_infrastructure
+        where <include refid="QueryWhere"/>
+        order by created_at desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(1) from fp_infrastructure where <include refid="QueryWhere"/>
+    </select>
+
+    <select id="selectAll" resultMap="InfrastructureMap">
+        select * from fp_infrastructure where tenant_id = #{tenantId} order by created_at desc
+    </select>
+
+    <select id="selectById" resultMap="InfrastructureMap">
+        select * from fp_infrastructure where tenant_id = #{tenantId} and id = #{id}
+    </select>
+
+    <select id="selectByCode" resultMap="InfrastructureMap">
+        select * from fp_infrastructure where tenant_id = #{tenantId} and code = #{code}
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.infrastructure.domain.model.InfrastructureEntity">
+        insert into fp_infrastructure
+        (id, tenant_id, type, code, name, env_id, region_id, endpoint, auth_type, username, password, api_key,
+         sync_scope, sync_mode, sync_enabled, sync_interval_sec, run_status, connection_status, last_test_message, last_test_at,
+         last_sync_at, last_sync_message, description, created_at, updated_at)
+        values
+        (#{id}, #{tenantId}, #{type}, #{code}, #{name}, #{envId}, #{regionId}, #{endpoint}, #{authType}, #{username},
+         #{password}, #{apiKey}, #{syncScope}, #{syncMode}, #{syncEnabled}, #{syncIntervalSec}, #{runStatus}, #{connectionStatus},
+         #{lastTestMessage}, #{lastTestAt}, #{lastSyncAt}, #{lastSyncMessage}, #{description}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.infrastructure.domain.model.InfrastructureEntity">
+        update fp_infrastructure
+        set type = #{type}, code = #{code}, name = #{name}, env_id = #{envId}, region_id = #{regionId},
+            endpoint = #{endpoint}, auth_type = #{authType}, username = #{username}, password = #{password},
+            api_key = #{apiKey}, sync_scope = #{syncScope}, sync_mode = #{syncMode}, sync_enabled = #{syncEnabled},
+            sync_interval_sec = #{syncIntervalSec}, description = #{description}, updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <update id="updateRuntime" parameterType="com.flowpulse.infrastructure.domain.model.InfrastructureEntity">
+        update fp_infrastructure
+        set run_status = #{runStatus}, connection_status = #{connectionStatus},
+            last_test_message = #{lastTestMessage}, last_test_at = #{lastTestAt},
+            last_sync_at = #{lastSyncAt}, last_sync_message = #{lastSyncMessage}, updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from fp_infrastructure where tenant_id = #{tenantId} and id = #{id}
+    </delete>
+</mapper>

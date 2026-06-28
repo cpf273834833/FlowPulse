@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.management.infrastructure.persistence.mapper.RegionMapper">
+    <resultMap id="RegionMap" type="com.flowpulse.management.domain.model.RegionEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="envId" column="env_id"/>
+        <result property="parentRegionId" column="parent_region_id"/>
+        <result property="regionType" column="region_type"/>
+        <result property="regionCode" column="region_code"/>
+        <result property="regionName" column="region_name"/>
+        <result property="description" column="description"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="RegionMap">
+        select * from fp_region where tenant_id = #{tenantId} order by created_at desc
+    </select>
+
+    <select id="selectById" resultMap="RegionMap">
+        select * from fp_region where tenant_id = #{tenantId} and id = #{id}
+    </select>
+
+    <select id="selectByCode" resultMap="RegionMap">
+        select * from fp_region where tenant_id = #{tenantId} and env_id = #{envId} and region_code = #{regionCode}
+    </select>
+
+    <select id="selectByEnvId" resultMap="RegionMap">
+        select * from fp_region where tenant_id = #{tenantId} and env_id = #{envId}
+    </select>
+
+    <select id="countChildren" resultType="int">
+        select count(1) from fp_region where tenant_id = #{tenantId} and parent_region_id = #{parentRegionId}
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.management.domain.model.RegionEntity">
+        insert into fp_region (id, tenant_id, env_id, parent_region_id, region_type, region_code, region_name, description, created_at, updated_at)
+        values (#{id}, #{tenantId}, #{envId}, #{parentRegionId}, #{regionType}, #{regionCode}, #{regionName}, #{description}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.management.domain.model.RegionEntity">
+        update fp_region
+        set env_id = #{envId}, parent_region_id = #{parentRegionId}, region_type = #{regionType},
+            region_code = #{regionCode}, region_name = #{regionName}, description = #{description}, updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from fp_region where tenant_id = #{tenantId} and id = #{id}
+    </delete>
+</mapper>

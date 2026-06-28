@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Frontend build output
+build/
+dist/
+
+# Java build output
+target/
+
+# Runtime data and logs
+data/
+*.log
+*.pid
+*.hprof
+*.dump
+*.mv.db
+*.trace.db
+
+# IDE and OS metadata
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local environment and credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+~$*

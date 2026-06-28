@@ -1,0 +1,31 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 http://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <id>patch</id>
+    <formats>
+        <format>tar.gz</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <dependencySets>
+        <dependencySet>
+            <outputDirectory>flowpulse-main/lib</outputDirectory>
+            <useProjectArtifact>true</useProjectArtifact>
+            <includes>
+                <include>uyun.flowpulse:*</include>
+            </includes>
+        </dependencySet>
+    </dependencySets>
+    <fileSets>
+        <fileSet>
+            <directory>../../flow-pulse-fronted/build</directory>
+            <outputDirectory>flowpulse-main/static</outputDirectory>
+        </fileSet>
+        <fileSet>
+            <directory>src/main/resources</directory>
+            <outputDirectory>flowpulse-main/config</outputDirectory>
+            <includes>
+                <include>application*.yml</include>
+            </includes>
+        </fileSet>
+    </fileSets>
+</assembly>

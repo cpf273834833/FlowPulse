@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.management.infrastructure.persistence.mapper.EnvironmentMapper">
+    <resultMap id="EnvironmentMap" type="com.flowpulse.management.domain.model.EnvironmentEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="envCode" column="env_code"/>
+        <result property="envName" column="env_name"/>
+        <result property="description" column="description"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="EnvironmentMap">
+        select * from fp_environment where tenant_id = #{tenantId} order by created_at desc
+    </select>
+
+    <select id="selectById" resultMap="EnvironmentMap">
+        select * from fp_environment where tenant_id = #{tenantId} and id = #{id}
+    </select>
+
+    <select id="selectByCode" resultMap="EnvironmentMap">
+        select * from fp_environment where tenant_id = #{tenantId} and env_code = #{envCode}
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.management.domain.model.EnvironmentEntity">
+        insert into fp_environment (id, tenant_id, env_code, env_name, description, created_at, updated_at)
+        values (#{id}, #{tenantId}, #{envCode}, #{envName}, #{description}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.management.domain.model.EnvironmentEntity">
+        update fp_environment
+        set env_code = #{envCode}, env_name = #{envName}, description = #{description}, updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from fp_environment where tenant_id = #{tenantId} and id = #{id}
+    </delete>
+</mapper>

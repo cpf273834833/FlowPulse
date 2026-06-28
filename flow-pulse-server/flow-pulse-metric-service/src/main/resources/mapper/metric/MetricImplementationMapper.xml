@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.metric.infrastructure.persistence.mapper.MetricImplementationMapper">
+    <resultMap id="MetricImplementationMap" type="com.flowpulse.metric.domain.model.MetricImplementationEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="metricDefinitionId" column="metric_definition_id"/>
+        <result property="metricCode" column="metric_code"/>
+        <result property="metricName" column="metric_name"/>
+        <result property="implementationCode" column="implementation_code"/>
+        <result property="implementationName" column="implementation_name"/>
+        <result property="implementationType" column="implementation_type"/>
+        <result property="executionMode" column="execution_mode"/>
+        <result property="scriptLanguage" column="script_language"/>
+        <result property="scriptContent" column="script_content"/>
+        <result property="configJson" column="config_json"/>
+        <result property="parameterSchemaJson" column="parameter_schema_json"/>
+        <result property="outputSchemaJson" column="output_schema_json"/>
+        <result property="builtInCollector" column="built_in_collector"/>
+        <result property="defaultImplementation" column="default_implementation"/>
+        <result property="enabled" column="enabled"/>
+        <result property="timeoutSec" column="timeout_sec"/>
+        <result property="description" column="description"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="BaseSelect">
+        select i.*, d.metric_code, d.metric_name
+        from fp_metric_implementation i
+        left join fp_metric_definition d on d.tenant_id = i.tenant_id and d.id = i.metric_definition_id
+    </sql>
+
+    <sql id="PageWhere">
+        where i.tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            and (lower(i.implementation_code) like concat('%', lower(#{keyword}), '%')
+             or lower(i.implementation_name) like concat('%', lower(#{keyword}), '%')
+             or lower(d.metric_code) like concat('%', lower(#{keyword}), '%')
+             or lower(d.metric_name) like concat('%', lower(#{keyword}), '%'))
+        </if>
+        <if test="metricDefinitionId != null and metricDefinitionId != ''">and i.metric_definition_id = #{metricDefinitionId}</if>
+        <if test="implementationType != null and implementationType != ''">and i.implementation_type = #{implementationType}</if>
+        <if test="enabled != null">and i.enabled = #{enabled}</if>
+    </sql>
+
+    <select id="selectPage" resultMap="MetricImplementationMap">
+        <include refid="BaseSelect"/>
+        <include refid="PageWhere"/>
+        order by i.created_at desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(1)
+        from fp_metric_implementation i
+        left join fp_metric_definition d on d.tenant_id = i.tenant_id and d.id = i.metric_definition_id
+        <include refid="PageWhere"/>
+    </select>
+
+    <select id="countAll" resultType="long">
+        select count(1) from fp_metric_implementation where tenant_id = #{tenantId}
+    </select>
+
+    <select id="countEnabled" resultType="long">
+        select count(1) from fp_metric_implementation where tenant_id = #{tenantId} and enabled = true
+    </select>
+
+    <select id="countDefault" resultType="long">
+        select count(1) from fp_metric_implementation where tenant_id = #{tenantId} and default_implementation = true
+    </select>
+
+    <select id="countScript" resultType="long">
+        select count(1) from fp_metric_implementation where tenant_id = #{tenantId} and implementation_type in ('SHELL', 'PYTHON')
+    </select>
+
+    <select id="selectById" resultMap="MetricImplementationMap">
+        <include refid="BaseSelect"/>
+        where i.tenant_id = #{tenantId} and i.id = #{id}
+    </select>
+
+    <select id="selectByCode" resultMap="MetricImplementationMap">
+        <include refid="BaseSelect"/>
+        where i.tenant_id = #{tenantId} and i.implementation_code = #{implementationCode}
+    </select>
+
+    <select id="selectDefaultByMetric" resultMap="MetricImplementationMap">
+        <include refid="BaseSelect"/>
+        where i.tenant_id = #{tenantId} and i.metric_definition_id = #{metricDefinitionId}
+          and i.default_implementation = true and i.enabled = true
+        order by i.updated_at desc
+        limit 1
+    </select>
+
+    <update id="clearDefault">
+        update fp_metric_implementation
+        set default_implementation = false
+        where tenant_id = #{tenantId} and metric_definition_id = #{metricDefinitionId}
+          <if test="excludeId != null and excludeId != ''">and id != #{excludeId}</if>
+    </update>
+
+    <insert id="insert" parameterType="com.flowpulse.metric.domain.model.MetricImplementationEntity">
+        insert into fp_metric_implementation
+        (id, tenant_id, metric_definition_id, implementation_code, implementation_name, implementation_type,
+         execution_mode, script_language, script_content, config_json, parameter_schema_json, output_schema_json,
+         built_in_collector, default_implementation, enabled, timeout_sec, description, created_at, updated_at)
+        values
+        (#{id}, #{tenantId}, #{metricDefinitionId}, #{implementationCode}, #{implementationName}, #{implementationType},
+         #{executionMode}, #{scriptLanguage}, #{scriptContent}, #{configJson}, #{parameterSchemaJson}, #{outputSchemaJson},
+         #{builtInCollector}, #{defaultImplementation}, #{enabled}, #{timeoutSec}, #{description}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.metric.domain.model.MetricImplementationEntity">
+        update fp_metric_implementation
+        set metric_definition_id = #{metricDefinitionId}, implementation_code = #{implementationCode},
+            implementation_name = #{implementationName}, implementation_type = #{implementationType},
+            execution_mode = #{executionMode}, script_language = #{scriptLanguage}, script_content = #{scriptContent},
+            config_json = #{configJson}, parameter_schema_json = #{parameterSchemaJson}, output_schema_json = #{outputSchemaJson},
+            built_in_collector = #{builtInCollector}, default_implementation = #{defaultImplementation},
+            enabled = #{enabled}, timeout_sec = #{timeoutSec}, description = #{description}, updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from fp_metric_implementation where tenant_id = #{tenantId} and id = #{id}
+    </delete>
+</mapper>
