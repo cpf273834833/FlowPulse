@@ -2,24 +2,18 @@ import React, { useEffect, useMemo, useState } from 'react';
 import ApiOutlined from '@uyun/icons/ApiOutlined';
 import CheckCircleOutlined from '@uyun/icons/CheckCircleOutlined';
 import ClockCircleOutlined from '@uyun/icons/ClockCircleOutlined';
-import DeleteOutlined from '@uyun/icons/DeleteOutlined';
 import EditOutlined from '@uyun/icons/EditOutlined';
-import PlusOutlined from '@uyun/icons/PlusOutlined';
 import SearchOutlined from '@uyun/icons/SearchOutlined';
 import SettingOutlined from '@uyun/icons/SettingOutlined';
 import { environmentRegionApi } from '../../api/environmentRegionApi';
 import { executorNodeApi } from '../../api/executorNodeApi';
-import { infrastructureApi } from '../../api/infrastructureApi';
 import { metricApi } from '../../api/metricApi';
-import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
 import Toast from '../../components/Toast';
 import { t } from '../../i18n';
 import './CollectionTaskPage.css';
 
 const EMPTY_REGION_PAGE = { environments: [], regions: [] };
-const EMPTY_INFRA_PAGE = { infrastructures: { records: [], total: 0 }, environments: [], regions: [] };
-const EMPTY_RESOURCE_PAGE = { records: [], total: 0, pageNo: 1, pageSize: 10 };
 const EMPTY_TASK_PAGE = { configs: { records: [], total: 0, pageNo: 1, pageSize: 10 }, stats: [] };
 
 const DEFAULT_TASK_FORM = {
@@ -52,34 +46,22 @@ const EXECUTION_OPTIONS = [
 
 export default function CollectionTaskPage() {
   const [regionPage, setRegionPage] = useState(EMPTY_REGION_PAGE);
-  const [infraPage, setInfraPage] = useState(EMPTY_INFRA_PAGE);
   const [tasks, setTasks] = useState(EMPTY_TASK_PAGE);
   const [definitions, setDefinitions] = useState([]);
   const [implementations, setImplementations] = useState([]);
   const [executorNodes, setExecutorNodes] = useState([]);
-  const [resources, setResources] = useState(EMPTY_RESOURCE_PAGE);
   const [scope, setScope] = useState({ envId: '', regionId: '' });
-  const [resourceInfrastructureId, setResourceInfrastructureId] = useState('');
   const [taskQuery, setTaskQuery] = useState({ pageNo: 1, pageSize: 10 });
-  const [resourceQuery, setResourceQuery] = useState({ pageNo: 1, pageSize: 10 });
   const [selectedTaskId, setSelectedTaskId] = useState('');
   const [route, setRoute] = useState({ name: 'list' });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
-  const [confirm, setConfirm] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const infrastructureIndex = useMemo(() => indexById(infraPage.infrastructures.records), [infraPage.infrastructures.records]);
   const metricIndex = useMemo(() => indexById(definitions), [definitions]);
   const implementationIndex = useMemo(() => indexById(implementations), [implementations]);
   const executorIndex = useMemo(() => indexById(executorNodes), [executorNodes]);
-  const availableInfrastructures = useMemo(
-    () => filterInfrastructuresByScope(infraPage.infrastructures.records, scope),
-    [infraPage.infrastructures.records, scope],
-  );
   const selectedTask = tasks.configs.records.find((item) => item.id === selectedTaskId) || tasks.configs.records[0];
-  const selectedInfrastructure = infrastructureIndex[resourceInfrastructureId];
-  const selectedResource = resources.records.find((item) => item.id === route.resourceId);
 
   useEffect(() => {
     loadBootstrap();
@@ -100,32 +82,16 @@ export default function CollectionTaskPage() {
     loadTasks({ ...taskQuery, pageNo: 1 });
   }, [scope.envId, scope.regionId]);
 
-  useEffect(() => {
-    if (resourceInfrastructureId) {
-      loadResources(resourceInfrastructureId, { ...resourceQuery, pageNo: 1 });
-    } else {
-      setResources(EMPTY_RESOURCE_PAGE);
-    }
-  }, [resourceInfrastructureId]);
-
-  useEffect(() => {
-    if (resourceInfrastructureId && !availableInfrastructures.some((item) => item.id === resourceInfrastructureId)) {
-      setResourceInfrastructureId('');
-    }
-  }, [availableInfrastructures, resourceInfrastructureId]);
-
   async function loadBootstrap() {
     setLoading(true);
     try {
-      const [regions, infra, metricPage, implementationPage, executorPage] = await Promise.all([
+      const [regions, metricPage, implementationPage, executorPage] = await Promise.all([
         environmentRegionApi.page(),
-        infrastructureApi.page({ pageNo: 1, pageSize: 200 }),
         metricApi.page({ pageNo: 1, pageSize: 200 }),
         metricApi.implementationPage({ pageNo: 1, pageSize: 300 }),
         executorNodeApi.page({ pageNo: 1, pageSize: 300 }),
       ]);
       setRegionPage(regions || EMPTY_REGION_PAGE);
-      setInfraPage(infra || EMPTY_INFRA_PAGE);
       setDefinitions(((metricPage || {}).metrics || {}).records || []);
       setImplementations(((implementationPage || {}).implementations || {}).records || []);
       setExecutorNodes(((executorPage || {}).nodes || {}).records || []);
@@ -156,16 +122,6 @@ export default function CollectionTaskPage() {
     }
   }
 
-  async function loadResources(infrastructureId, nextQuery = resourceQuery) {
-    try {
-      const data = await infrastructureApi.resources(infrastructureId, nextQuery);
-      setResources(data || EMPTY_RESOURCE_PAGE);
-      setResourceQuery(nextQuery);
-    } catch (error) {
-      showMessage(error.message, 'error');
-    }
-  }
-
   function showMessage(text, type = '') {
     setMessage(text);
     setMessageType(type);
@@ -175,23 +131,6 @@ export default function CollectionTaskPage() {
     setScope({ envId: nextScope.envId || '', regionId: nextScope.regionId || '' });
     setTaskQuery({ ...taskQuery, pageNo: 1 });
     setSelectedTaskId('');
-  }
-
-  function openCreate(resource) {
-    const infra = infrastructureIndex[scope.infrastructureId];
-    const objectType = resource ? resource.resourceType : (infra && infra.type) || '';
-    setRoute({
-      name: 'form',
-      mode: 'create',
-      resourceId: resource ? resource.id : '',
-      form: {
-        ...DEFAULT_TASK_FORM,
-        objectType,
-        objectId: resource ? resource.id : '',
-        objectCode: resource ? resource.resourceCode : '',
-        objectName: resource ? resource.resourceName : '',
-      },
-    });
   }
 
   function openEdit(task) {
@@ -205,11 +144,7 @@ export default function CollectionTaskPage() {
   async function submitTask(form) {
     try {
       const payload = normalizeTaskPayload(form);
-      if (route.mode === 'edit' && form.id) {
-        await metricApi.updateResourceConfig(form.id, payload);
-      } else {
-        await metricApi.createResourceConfig(payload);
-      }
+      await metricApi.updateResourceConfig(form.id, payload);
       showMessage(t('collectionTask.saved'), 'success');
       setRoute({ name: 'list' });
       await loadTasks(taskQuery);
@@ -218,44 +153,12 @@ export default function CollectionTaskPage() {
     }
   }
 
-  async function toggleTask(task) {
-    try {
-      await metricApi.updateResourceConfig(task.id, normalizeTaskPayload({ ...toForm(task), enabled: !task.enabled }));
-      showMessage(task.enabled ? t('collectionTask.disabledMessage') : t('collectionTask.enabledMessage'), 'success');
-      await loadTasks(taskQuery);
-    } catch (error) {
-      showMessage(error.message, 'error');
-    }
-  }
-
-  function requestDelete(task) {
-    setConfirm({
-      title: t('confirmDelete'),
-      content: t('deleteConfirmContent', task.metricName || task.objectName),
-      onConfirm: async () => {
-        try {
-          await metricApi.deleteResourceConfig(task.id);
-          setConfirm(null);
-          showMessage(t('deleteSuccess'), 'success');
-          await loadTasks(taskQuery);
-        } catch (error) {
-          setConfirm(null);
-          showMessage(error.message, 'error');
-        }
-      },
-    });
-  }
-
   if (route.name === 'form') {
     return (
       <TaskFormPage
         route={route}
-        definitions={definitions}
         implementations={implementations}
         executorNodes={executorNodes}
-        resources={resources.records}
-        selectedInfrastructure={selectedInfrastructure}
-        selectedResource={selectedResource}
         metricIndex={metricIndex}
         implementationIndex={implementationIndex}
         onBack={() => setRoute({ name: 'list' })}
@@ -277,10 +180,6 @@ export default function CollectionTaskPage() {
         executor={detailTask && executorIndex[detailTask.executorNodeId]}
         onBack={() => setRoute({ name: 'list' })}
         onEdit={() => openEdit(detailTask)}
-        onToggle={() => toggleTask(detailTask)}
-        onDelete={() => requestDelete(detailTask)}
-        confirm={confirm}
-        onCancelConfirm={() => setConfirm(null)}
         message={message}
         messageType={messageType}
         onClearMessage={() => showMessage('')}
@@ -295,10 +194,6 @@ export default function CollectionTaskPage() {
           <h1>{t('menuCollectionTask')}</h1>
           <p>{t('collectionTask.pageDesc')}</p>
         </div>
-        <button className="fp-button fp-button--primary" type="button" disabled={!resourceInfrastructureId} onClick={() => openCreate()}>
-          <PlusOutlined />
-          {t('collectionTask.add')}
-        </button>
       </div>
 
       <Toast message={message} type={messageType} onClose={() => showMessage('')} />
@@ -328,7 +223,7 @@ export default function CollectionTaskPage() {
           <div className="fp-task-toolbar">
             <div>
               <h2>{t('collectionTask.taskList')}</h2>
-              <p>{selectedInfrastructure ? t('collectionTask.scopeInfra', selectedInfrastructure.name) : t('collectionTask.scopeAll')}</p>
+              <p>{t('collectionTask.queryOnlyDesc')}</p>
             </div>
             <div className="fp-filter-row fp-filter-row--task">
               <label className="fp-inline-search">
@@ -385,9 +280,7 @@ export default function CollectionTaskPage() {
                 <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
                 <span className="fp-row-actions" onClick={(event) => event.stopPropagation()}>
                   <button type="button" onClick={() => setRoute({ name: 'detail', id: task.id })}>{t('detail')}</button>
-                  <button type="button" onClick={() => openEdit(task)}>{t('edit')}</button>
-                  <button type="button" onClick={() => toggleTask(task)}>{task.enabled ? t('collectionTask.disable') : t('collectionTask.enable')}</button>
-                  <button type="button" onClick={() => requestDelete(task)}>{t('delete')}</button>
+                  <button type="button" onClick={() => openEdit(task)}>{t('collectionTask.config')}</button>
                 </span>
               </div>
             ))}
@@ -402,35 +295,16 @@ export default function CollectionTaskPage() {
         </div>
 
         <aside className="fp-task-side">
-          <TaskSidePanel
-            task={selectedTask}
-            metric={selectedTask && metricIndex[selectedTask.metricDefinitionId]}
-            implementation={selectedTask && implementationIndex[selectedTask.implementationId]}
-            executor={selectedTask && executorIndex[selectedTask.executorNodeId]}
-            onDetail={() => selectedTask && setRoute({ name: 'detail', id: selectedTask.id })}
-            onCreate={() => openCreate()}
+          <TaskStatusList
+            tasks={tasks.configs.records}
+            selectedTaskId={selectedTask && selectedTask.id}
+            executorIndex={executorIndex}
+            onSelect={setSelectedTaskId}
+            onDetail={(task) => setRoute({ name: 'detail', id: task.id })}
+            onConfig={openEdit}
           />
-            <ResourcePanel
-              infrastructure={selectedInfrastructure}
-              infrastructures={availableInfrastructures}
-              infrastructureId={resourceInfrastructureId}
-              onInfrastructureChange={setResourceInfrastructureId}
-              resources={resources}
-              query={resourceQuery}
-              onQueryChange={(next) => loadResources(resourceInfrastructureId, { ...resourceQuery, ...next })}
-              onCreate={openCreate}
-            />
         </aside>
       </div>
-
-      {confirm ? (
-        <ConfirmDialog
-          title={confirm.title}
-          content={confirm.content}
-          onConfirm={confirm.onConfirm}
-          onCancel={() => setConfirm(null)}
-        />
-      ) : null}
     </section>
   );
 }
@@ -477,135 +351,60 @@ function ScopePanel({ environments, regions, scope, onSelect }) {
   );
 }
 
-function ResourcePanel({ infrastructure, infrastructures, infrastructureId, onInfrastructureChange, resources, query, onQueryChange, onCreate }) {
-  const [keyword, setKeyword] = useState(query.keyword || '');
-
-  useEffect(() => {
-    setKeyword(query.keyword || '');
-  }, [query.keyword]);
-
+function TaskStatusList({ tasks, selectedTaskId, executorIndex, onSelect, onDetail, onConfig }) {
   return (
-    <section className="fp-task-resource-panel">
-      <div className="fp-side-section__title">
-        <h3>{t('collectionTask.resourcePool')}</h3>
-        <span className="fp-mini-tag">{resources.total || 0}</span>
-      </div>
-      <select className="fp-native-select" value={infrastructureId || ''} onChange={(event) => onInfrastructureChange(event.target.value)}>
-        <option value="">{t('collectionTask.selectInfrastructure')}</option>
-        {infrastructures.map((item) => <option key={item.id} value={item.id}>{item.name} / {item.type}</option>)}
-      </select>
-      {!infrastructure ? (
-        <div className="fp-side-empty">{t('collectionTask.selectInfrastructureFirst')}</div>
-      ) : (
-        <>
-          <label className="fp-inline-search fp-task-resource-search">
-            <SearchOutlined />
-            <input
-              value={keyword}
-              placeholder={t('infrastructure.searchResource')}
-              onChange={(event) => setKeyword(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  onQueryChange({ keyword, pageNo: 1 });
-                }
-              }}
-            />
-          </label>
-          <div className="fp-side-card-list">
-            {resources.records.map((resource) => (
-              <button className="fp-side-card fp-resource-pick-card" type="button" key={resource.id} onClick={() => onCreate(resource)}>
-                <strong>{resource.resourceName}</strong>
-                <span>{resource.resourceCode}</span>
-                <em>{resource.resourceType}</em>
-              </button>
-            ))}
-            {resources.records.length === 0 && <div className="fp-side-empty">{t('empty')}</div>}
-          </div>
-          <Pagination
-            pageNo={resources.pageNo}
-            pageSize={resources.pageSize}
-            total={resources.total}
-            onChange={onQueryChange}
-          />
-        </>
-      )}
-    </section>
-  );
-}
-
-function TaskSidePanel({ task, metric, implementation, executor, onDetail, onCreate }) {
-  if (!task) {
-    return (
-      <section className="fp-metric-side fp-task-preview">
-        <div className="fp-side-empty">{t('collectionTask.noTaskSelected')}</div>
-        <button className="fp-button fp-button--primary" type="button" onClick={onCreate}>
-          <PlusOutlined />
-          {t('collectionTask.add')}
-        </button>
-      </section>
-    );
-  }
-  return (
-    <section className="fp-metric-side fp-task-preview">
+    <section className="fp-metric-side fp-task-status-list">
       <div className="fp-metric-side__head">
         <div>
-          <h2>{task.objectName}</h2>
-          <p>{task.objectCode}</p>
+          <h2>{t('collectionTask.taskStatusList')}</h2>
+          <p>{t('collectionTask.taskStatusListDesc')}</p>
         </div>
-        <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
+        <span className="fp-mini-tag">{tasks.length}</span>
       </div>
-      <div className="fp-side-section">
-        <h3>{t('collectionTask.taskRelation')}</h3>
-        <SideInfo label={t('metric.name')} value={(metric && metric.name) || task.metricName} />
-        <SideInfo label={t('metric.implementation')} value={(implementation && implementation.name) || task.implementationName || t('metric.useDefaultImplementation')} />
-        <SideInfo label={t('metric.executionMode')} value={executionLabel(task.executionMode)} />
-        <SideInfo label={t('collectionTask.executorNode')} value={executor ? executor.host : task.executorNodeId || '-'} />
-      </div>
-      <div className="fp-side-section">
-        <h3>{t('collectionTask.runtimeState')}</h3>
-        <SideInfo label={t('metric.interval')} value={`${task.intervalSec || '-'}s`} />
-        <SideInfo label={t('collectionTask.lastCollectAt')} value={formatTime(task.lastCollectAt)} />
-        <SideInfo label={t('collectionTask.nextCollectAt')} value={formatTime(task.nextCollectAt)} />
-        <SideInfo label={t('collectionTask.lastMessage')} value={task.lastCollectMessage || '-'} />
-      </div>
-      <div className="fp-metric-side__actions">
-        <button className="fp-button fp-button--primary" type="button" onClick={onDetail}>{t('detail')}</button>
+      <div className="fp-task-status-items">
+        {tasks.map((task) => {
+          const executor = executorIndex[task.executorNodeId];
+          return (
+            <button
+              className={`fp-task-status-card ${selectedTaskId === task.id ? 'is-selected' : ''}`}
+              type="button"
+              key={task.id}
+              onClick={() => onSelect(task.id)}
+            >
+              <span className="fp-task-status-card__head">
+                <strong>{task.objectName}</strong>
+                <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
+              </span>
+              <em>{task.metricName || task.metricCode || '-'}</em>
+              <span className="fp-task-status-card__meta">
+                <span>{executionLabel(task.executionMode)}</span>
+                <span>{executor ? executor.host : task.executorNodeId || '-'}</span>
+              </span>
+              <span className="fp-task-status-card__meta">
+                <span>{t('metric.interval')} {task.intervalSec || '-'}s</span>
+                <span>{t('collectionTask.nextCollectAt')} {formatTime(task.nextCollectAt)}</span>
+              </span>
+              <span className="fp-task-status-card__actions" onClick={(event) => event.stopPropagation()}>
+                <button type="button" onClick={() => onDetail(task)}>{t('detail')}</button>
+                <button type="button" onClick={() => onConfig(task)}>{t('collectionTask.config')}</button>
+              </span>
+            </button>
+          );
+        })}
+        {tasks.length === 0 ? <div className="fp-side-empty">{t('empty')}</div> : null}
       </div>
     </section>
   );
 }
 
-function TaskFormPage({ route, definitions, implementations, executorNodes, resources, selectedInfrastructure, selectedResource, metricIndex, implementationIndex, onBack, onSubmit, message, messageType, onClearMessage }) {
+function TaskFormPage({ route, implementations, executorNodes, metricIndex, implementationIndex, onBack, onSubmit, message, messageType, onClearMessage }) {
   const [form, setForm] = useState(route.form || DEFAULT_TASK_FORM);
   const metric = metricIndex[form.metricDefinitionId];
   const availableImplementations = implementations.filter((item) => !form.metricDefinitionId || item.metricDefinitionId === form.metricDefinitionId);
   const selectedImplementation = implementationIndex[form.implementationId];
 
-  useEffect(() => {
-    if (route.mode === 'create' && selectedResource) {
-      setForm((current) => ({
-        ...current,
-        objectType: selectedResource.resourceType,
-        objectId: selectedResource.id,
-        objectCode: selectedResource.resourceCode,
-        objectName: selectedResource.resourceName,
-      }));
-    }
-  }, [selectedResource, route.mode]);
-
   function update(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
-  }
-
-  function chooseResource(id) {
-    const resource = resources.find((item) => item.id === id);
-    setForm((current) => ({
-      ...current,
-      objectId: resource ? resource.id : '',
-      objectType: resource ? resource.resourceType : '',
-      objectCode: resource ? resource.resourceCode : '',
-      objectName: resource ? resource.resourceName : '',
-    }));
   }
 
   function submit(event) {
@@ -619,7 +418,7 @@ function TaskFormPage({ route, definitions, implementations, executorNodes, reso
       <div className="fp-detail-hero fp-task-form-hero">
         <div>
           <span className="fp-kicker">{route.mode === 'edit' ? t('collectionTask.edit') : t('collectionTask.add')}</span>
-          <h1>{route.mode === 'edit' ? (form.objectName || '-') : t('collectionTask.createTitle')}</h1>
+          <h1>{form.objectName || '-'}</h1>
           <p>{t('collectionTask.formDesc')}</p>
         </div>
         <div className="fp-actions fp-actions--wrap">
@@ -631,37 +430,27 @@ function TaskFormPage({ route, definitions, implementations, executorNodes, reso
       <form id="collection-task-form" className="fp-form fp-task-form" onSubmit={submit}>
         <FormSection title={t('collectionTask.objectSection')} desc={t('collectionTask.objectSectionDesc')}>
           <label className="fp-field">
-            <span>{t('infrastructure.list')}</span>
-            <input value={selectedInfrastructure ? selectedInfrastructure.name : '-'} disabled />
-          </label>
-          <label className="fp-field">
-            <span>{t('collectionTask.resourceObject')}</span>
-            {route.mode === 'edit' ? (
-              <input value={form.objectName} disabled />
-            ) : (
-              <select value={form.objectId} onChange={(event) => chooseResource(event.target.value)} required>
-                <option value="">{t('selectPlaceholder')}</option>
-                {resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.resourceName} / {resource.resourceCode}</option>)}
-              </select>
-            )}
-          </label>
-          <label className="fp-field">
             <span>{t('metric.objectType')}</span>
             <input value={form.objectType || '-'} disabled />
           </label>
           <label className="fp-field">
+            <span>{t('collectionTask.resourceObject')}</span>
+            <input value={form.objectName} disabled />
+          </label>
+          <label className="fp-field">
             <span>{t('metric.objectId')}</span>
             <input value={form.objectCode || '-'} disabled />
+          </label>
+          <label className="fp-field">
+            <span>{t('metric.code')}</span>
+            <input value={(metric && metric.code) || form.metricCode || '-'} disabled />
           </label>
         </FormSection>
 
         <FormSection title={t('collectionTask.metricSection')} desc={t('collectionTask.metricSectionDesc')}>
           <label className="fp-field">
             <span>{t('metric.name')}</span>
-            <select value={form.metricDefinitionId} onChange={(event) => update('metricDefinitionId', event.target.value)} required disabled={route.mode === 'edit'}>
-              <option value="">{t('selectPlaceholder')}</option>
-              {definitions.map((item) => <option key={item.id} value={item.id}>{item.name} / {item.code}</option>)}
-            </select>
+            <input value={(metric && metric.name) || form.metricName || '-'} disabled />
           </label>
           <label className="fp-field">
             <span>{t('metric.implementation')}</span>
@@ -716,7 +505,7 @@ function TaskFormPage({ route, definitions, implementations, executorNodes, reso
   );
 }
 
-function TaskDetailPage({ task, metric, implementation, executor, onBack, onEdit, onToggle, onDelete, confirm, onCancelConfirm, message, messageType, onClearMessage }) {
+function TaskDetailPage({ task, metric, implementation, executor, onBack, onEdit, message, messageType, onClearMessage }) {
   if (!task) {
     return null;
   }
@@ -731,9 +520,7 @@ function TaskDetailPage({ task, metric, implementation, executor, onBack, onEdit
         </div>
         <div className="fp-actions fp-actions--wrap">
           <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
-          <button className="fp-button" type="button" onClick={onToggle}>{task.enabled ? t('collectionTask.disable') : t('collectionTask.enable')}</button>
-          <button className="fp-button" type="button" onClick={onEdit}><EditOutlined />{t('edit')}</button>
-          <button className="fp-button fp-button--ghost-danger" type="button" onClick={onDelete}><DeleteOutlined />{t('delete')}</button>
+          <button className="fp-button" type="button" onClick={onEdit}><EditOutlined />{t('collectionTask.config')}</button>
         </div>
       </div>
       <Toast message={message} type={messageType} onClose={onClearMessage} />
@@ -764,14 +551,6 @@ function TaskDetailPage({ task, metric, implementation, executor, onBack, onEdit
           <Info label={t('description')} value={task.description || '-'} />
         </DetailSection>
       </div>
-      {confirm ? (
-        <ConfirmDialog
-          title={confirm.title}
-          content={confirm.content}
-          onConfirm={confirm.onConfirm}
-          onCancel={onCancelConfirm}
-        />
-      ) : null}
     </section>
   );
 }
@@ -800,15 +579,6 @@ function Info({ label, value }) {
     <div className="fp-info-box">
       <span>{label}</span>
       <strong><span>{value || '-'}</span></strong>
-    </div>
-  );
-}
-
-function SideInfo({ label, value }) {
-  return (
-    <div className="fp-side-info">
-      <span>{label}</span>
-      <strong>{value || '-'}</strong>
     </div>
   );
 }
@@ -894,18 +664,6 @@ function formatTime(value) {
     return '-';
   }
   return new Date(Number(value)).toLocaleString('zh-CN', { hour12: false });
-}
-
-function filterInfrastructuresByScope(infrastructures, scope) {
-  return (infrastructures || []).filter((item) => {
-    if (scope.regionId) {
-      return item.regionId === scope.regionId;
-    }
-    if (scope.envId) {
-      return item.envId === scope.envId;
-    }
-    return true;
-  });
 }
 
 function executionLabel(value) {

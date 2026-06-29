@@ -108,38 +108,77 @@
   position: static;
 }
 
-.fp-task-resource-panel {
+.fp-task-status-list {
+  position: sticky;
+  top: 12px;
+}
+
+.fp-task-status-items {
   display: grid;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid rgba(82, 139, 207, 0.24);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(8, 28, 56, 0.92), rgba(5, 17, 35, 0.95));
+  gap: 10px;
+  max-height: calc(100vh - 270px);
+  overflow: auto;
+  padding: 14px;
 }
 
-.fp-task-resource-search {
-  margin: 0;
-}
-
-.fp-resource-pick-card {
+.fp-task-status-card {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(91, 148, 214, 0.22);
+  border-radius: 14px;
+  color: var(--fp-text);
+  text-align: left;
+  background: rgba(4, 17, 36, 0.68);
   cursor: pointer;
+  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
 }
 
-.fp-resource-pick-card strong {
+.fp-task-status-card:hover,
+.fp-task-status-card.is-selected {
+  border-color: rgba(50, 190, 255, 0.5);
+  background: rgba(13, 47, 86, 0.72);
+  box-shadow: inset 3px 0 0 #24b7ff;
+}
+
+.fp-task-status-card__head,
+.fp-task-status-card__meta,
+.fp-task-status-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fp-task-status-card strong,
+.fp-task-status-card em,
+.fp-task-status-card__meta span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fp-task-resource-panel .fp-pagination {
-  justify-content: flex-start;
-  gap: 6px;
+.fp-task-status-card em,
+.fp-task-status-card__meta {
+  color: var(--fp-muted);
   font-size: 12px;
+  font-style: normal;
 }
 
-.fp-task-resource-panel .fp-pagination label:nth-of-type(2),
-.fp-task-resource-panel .fp-pagination button:last-child {
-  display: none;
+.fp-task-status-card__actions {
+  justify-content: flex-start;
+  padding-top: 2px;
+}
+
+.fp-task-status-card__actions button {
+  border: 0;
+  color: #62d4ff;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .fp-task-form-hero {
