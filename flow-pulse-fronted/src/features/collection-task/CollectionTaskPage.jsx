@@ -15,6 +15,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
 import Toast from '../../components/Toast';
 import { t } from '../../i18n';
+import './CollectionTaskPage.css';
 
 const EMPTY_REGION_PAGE = { environments: [], regions: [] };
 const EMPTY_INFRA_PAGE = { infrastructures: { records: [], total: 0 }, environments: [], regions: [] };
@@ -57,7 +58,8 @@ export default function CollectionTaskPage() {
   const [implementations, setImplementations] = useState([]);
   const [executorNodes, setExecutorNodes] = useState([]);
   const [resources, setResources] = useState(EMPTY_RESOURCE_PAGE);
-  const [scope, setScope] = useState({ envId: '', regionId: '', infrastructureId: '' });
+  const [scope, setScope] = useState({ envId: '', regionId: '' });
+  const [resourceInfrastructureId, setResourceInfrastructureId] = useState('');
   const [taskQuery, setTaskQuery] = useState({ pageNo: 1, pageSize: 10 });
   const [resourceQuery, setResourceQuery] = useState({ pageNo: 1, pageSize: 10 });
   const [selectedTaskId, setSelectedTaskId] = useState('');
@@ -71,8 +73,12 @@ export default function CollectionTaskPage() {
   const metricIndex = useMemo(() => indexById(definitions), [definitions]);
   const implementationIndex = useMemo(() => indexById(implementations), [implementations]);
   const executorIndex = useMemo(() => indexById(executorNodes), [executorNodes]);
+  const availableInfrastructures = useMemo(
+    () => filterInfrastructuresByScope(infraPage.infrastructures.records, scope),
+    [infraPage.infrastructures.records, scope],
+  );
   const selectedTask = tasks.configs.records.find((item) => item.id === selectedTaskId) || tasks.configs.records[0];
-  const selectedInfrastructure = infrastructureIndex[scope.infrastructureId];
+  const selectedInfrastructure = infrastructureIndex[resourceInfrastructureId];
   const selectedResource = resources.records.find((item) => item.id === route.resourceId);
 
   useEffect(() => {
@@ -92,15 +98,21 @@ export default function CollectionTaskPage() {
 
   useEffect(() => {
     loadTasks({ ...taskQuery, pageNo: 1 });
-  }, [scope.envId, scope.regionId, scope.infrastructureId]);
+  }, [scope.envId, scope.regionId]);
 
   useEffect(() => {
-    if (scope.infrastructureId) {
-      loadResources(scope.infrastructureId, { ...resourceQuery, pageNo: 1 });
+    if (resourceInfrastructureId) {
+      loadResources(resourceInfrastructureId, { ...resourceQuery, pageNo: 1 });
     } else {
       setResources(EMPTY_RESOURCE_PAGE);
     }
-  }, [scope.infrastructureId]);
+  }, [resourceInfrastructureId]);
+
+  useEffect(() => {
+    if (resourceInfrastructureId && !availableInfrastructures.some((item) => item.id === resourceInfrastructureId)) {
+      setResourceInfrastructureId('');
+    }
+  }, [availableInfrastructures, resourceInfrastructureId]);
 
   async function loadBootstrap() {
     setLoading(true);
@@ -131,7 +143,6 @@ export default function CollectionTaskPage() {
         ...nextQuery,
         envId: scope.envId || undefined,
         regionId: scope.regionId || undefined,
-        infrastructureId: scope.infrastructureId || undefined,
       };
       const data = await metricApi.resourceConfigPage(normalizeQuery(query));
       setTasks(data || EMPTY_TASK_PAGE);
@@ -161,7 +172,7 @@ export default function CollectionTaskPage() {
   }
 
   function selectScope(nextScope) {
-    setScope({ envId: nextScope.envId || '', regionId: nextScope.regionId || '', infrastructureId: nextScope.infrastructureId || '' });
+    setScope({ envId: nextScope.envId || '', regionId: nextScope.regionId || '' });
     setTaskQuery({ ...taskQuery, pageNo: 1 });
     setSelectedTaskId('');
   }
@@ -282,7 +293,7 @@ export default function CollectionTaskPage() {
           <h1>{t('menuCollectionTask')}</h1>
           <p>{t('collectionTask.pageDesc')}</p>
         </div>
-        <button className="fp-button fp-button--primary" type="button" disabled={!scope.infrastructureId} onClick={() => openCreate()}>
+        <button className="fp-button fp-button--primary" type="button" disabled={!resourceInfrastructureId} onClick={() => openCreate()}>
           <PlusOutlined />
           {t('collectionTask.add')}
         </button>
@@ -307,7 +318,6 @@ export default function CollectionTaskPage() {
         <ScopePanel
           environments={regionPage.environments}
           regions={regionPage.regions}
-          infrastructures={infraPage.infrastructures.records}
           scope={scope}
           onSelect={selectScope}
         />
@@ -398,13 +408,16 @@ export default function CollectionTaskPage() {
             onDetail={() => selectedTask && setRoute({ name: 'detail', id: selectedTask.id })}
             onCreate={() => openCreate()}
           />
-          <ResourcePanel
-            infrastructure={selectedInfrastructure}
-            resources={resources}
-            query={resourceQuery}
-            onQueryChange={(next) => loadResources(scope.infrastructureId, { ...resourceQuery, ...next })}
-            onCreate={openCreate}
-          />
+            <ResourcePanel
+              infrastructure={selectedInfrastructure}
+              infrastructures={availableInfrastructures}
+              infrastructureId={resourceInfrastructureId}
+              onInfrastructureChange={setResourceInfrastructureId}
+              resources={resources}
+              query={resourceQuery}
+              onQueryChange={(next) => loadResources(resourceInfrastructureId, { ...resourceQuery, ...next })}
+              onCreate={openCreate}
+            />
         </aside>
       </div>
 
@@ -413,14 +426,13 @@ export default function CollectionTaskPage() {
   );
 }
 
-function ScopePanel({ environments, regions, infrastructures, scope, onSelect }) {
-  const infraByRegion = useMemo(() => groupBy(infrastructures, 'regionId'), [infrastructures]);
+function ScopePanel({ environments, regions, scope, onSelect }) {
   const managementRegions = regions.filter((region) => region.regionType === 'MANAGEMENT');
 
   return (
     <aside className="fp-infra-tree fp-task-scope">
       <strong className="fp-infra-tree__title">{t('collectionTask.scopeTree')}</strong>
-      <button className={!scope.envId && !scope.regionId && !scope.infrastructureId ? 'is-active' : ''} type="button" onClick={() => onSelect({})}>
+          <button className={!scope.envId && !scope.regionId ? 'is-active' : ''} type="button" onClick={() => onSelect({})}>
         <span>{t('collectionTask.allScope')}</span>
         <em>{t('collectionTask.allTask')}</em>
       </button>
@@ -433,19 +445,17 @@ function ScopePanel({ environments, regions, infrastructures, scope, onSelect })
           <div className="fp-tree-children">
             {managementRegions.filter((region) => region.envId === environment.id).map((management) => (
               <div className="fp-tree-management" key={management.id}>
-                <button className={scope.regionId === management.id && !scope.infrastructureId ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: management.id })}>
+                <button className={scope.regionId === management.id ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: management.id })}>
                   <span>{management.regionName}</span>
                   <em>{t('managementRegion')}</em>
                 </button>
-                <InfraNodes environment={environment} region={management} activeId={scope.infrastructureId} items={infraByRegion[management.id] || []} onSelect={onSelect} />
                 <div className="fp-tree-computes">
                   {regions.filter((region) => region.parentRegionId === management.id).map((compute) => (
                     <div className="fp-tree-compute" key={compute.id}>
-                      <button className={scope.regionId === compute.id && !scope.infrastructureId ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: compute.id })}>
+                      <button className={scope.regionId === compute.id ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: compute.id })}>
                         <span>{compute.regionName}</span>
                         <em>{t('computeRegion')}</em>
                       </button>
-                      <InfraNodes environment={environment} region={compute} activeId={scope.infrastructureId} items={infraByRegion[compute.id] || []} onSelect={onSelect} />
                     </div>
                   ))}
                 </div>
@@ -458,23 +468,7 @@ function ScopePanel({ environments, regions, infrastructures, scope, onSelect })
   );
 }
 
-function InfraNodes({ environment, region, activeId, items, onSelect }) {
-  if (items.length === 0) {
-    return null;
-  }
-  return (
-    <div className="fp-tree-infra-list">
-      {items.map((item) => (
-        <button className={`fp-tree-infra ${activeId === item.id ? 'is-active' : ''}`} type="button" key={item.id} onClick={() => onSelect({ envId: environment.id, regionId: region.id, infrastructureId: item.id })}>
-          <span>{item.name}</span>
-          <em>{item.type}</em>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ResourcePanel({ infrastructure, resources, query, onQueryChange, onCreate }) {
+function ResourcePanel({ infrastructure, infrastructures, infrastructureId, onInfrastructureChange, resources, query, onQueryChange, onCreate }) {
   const [keyword, setKeyword] = useState(query.keyword || '');
 
   useEffect(() => {
@@ -487,6 +481,10 @@ function ResourcePanel({ infrastructure, resources, query, onQueryChange, onCrea
         <h3>{t('collectionTask.resourcePool')}</h3>
         <span className="fp-mini-tag">{resources.total || 0}</span>
       </div>
+      <select className="fp-native-select" value={infrastructureId || ''} onChange={(event) => onInfrastructureChange(event.target.value)}>
+        <option value="">{t('collectionTask.selectInfrastructure')}</option>
+        {infrastructures.map((item) => <option key={item.id} value={item.id}>{item.name} / {item.type}</option>)}
+      </select>
       {!infrastructure ? (
         <div className="fp-side-empty">{t('collectionTask.selectInfrastructureFirst')}</div>
       ) : (
@@ -874,20 +872,23 @@ function indexById(list) {
   }, {});
 }
 
-function groupBy(list, field) {
-  return (list || []).reduce((index, item) => {
-    const key = item[field] || '';
-    index[key] = index[key] || [];
-    index[key].push(item);
-    return index;
-  }, {});
-}
-
 function formatTime(value) {
   if (!value) {
     return '-';
   }
   return new Date(Number(value)).toLocaleString('zh-CN', { hour12: false });
+}
+
+function filterInfrastructuresByScope(infrastructures, scope) {
+  return (infrastructures || []).filter((item) => {
+    if (scope.regionId) {
+      return item.regionId === scope.regionId;
+    }
+    if (scope.envId) {
+      return item.envId === scope.envId;
+    }
+    return true;
+  });
 }
 
 function executionLabel(value) {
