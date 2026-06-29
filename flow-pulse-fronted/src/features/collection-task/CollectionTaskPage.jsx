@@ -62,6 +62,10 @@ export default function CollectionTaskPage() {
   const implementationIndex = useMemo(() => indexById(implementations), [implementations]);
   const executorIndex = useMemo(() => indexById(executorNodes), [executorNodes]);
   const selectedTask = tasks.configs.records.find((item) => item.id === selectedTaskId) || tasks.configs.records[0];
+  const regionOptions = useMemo(
+    () => regionPage.regions.filter((region) => !scope.envId || region.envId === scope.envId),
+    [regionPage.regions, scope.envId],
+  );
 
   useEffect(() => {
     loadBootstrap();
@@ -131,6 +135,15 @@ export default function CollectionTaskPage() {
     setScope({ envId: nextScope.envId || '', regionId: nextScope.regionId || '' });
     setTaskQuery({ ...taskQuery, pageNo: 1 });
     setSelectedTaskId('');
+  }
+
+  function changeEnvironment(envId) {
+    selectScope({ envId, regionId: '' });
+  }
+
+  function changeRegion(regionId) {
+    const region = regionPage.regions.find((item) => item.id === regionId);
+    selectScope({ envId: region ? region.envId : scope.envId, regionId });
   }
 
   function openEdit(task) {
@@ -212,13 +225,6 @@ export default function CollectionTaskPage() {
       </div>
 
       <div className="fp-task-workbench">
-        <ScopePanel
-          environments={regionPage.environments}
-          regions={regionPage.regions}
-          scope={scope}
-          onSelect={selectScope}
-        />
-
         <div className="fp-card fp-task-list-panel">
           <div className="fp-task-toolbar">
             <div>
@@ -241,6 +247,26 @@ export default function CollectionTaskPage() {
               </label>
               <select
                 className="fp-native-select"
+                value={scope.envId}
+                onChange={(event) => changeEnvironment(event.target.value)}
+              >
+                <option value="">{t('infrastructure.allEnv')}</option>
+                {regionPage.environments.map((environment) => (
+                  <option key={environment.id} value={environment.id}>{environment.envName}</option>
+                ))}
+              </select>
+              <select
+                className="fp-native-select"
+                value={scope.regionId}
+                onChange={(event) => changeRegion(event.target.value)}
+              >
+                <option value="">{t('infrastructure.allRegion')}</option>
+                {regionOptions.map((region) => (
+                  <option key={region.id} value={region.id}>{region.regionName}</option>
+                ))}
+              </select>
+              <select
+                className="fp-native-select"
                 value={taskQuery.enabled === undefined ? '' : String(taskQuery.enabled)}
                 onChange={(event) => loadTasks({ ...taskQuery, enabled: event.target.value || undefined, pageNo: 1 })}
               >
@@ -257,6 +283,7 @@ export default function CollectionTaskPage() {
               <span>{t('metric.executionMode')}</span>
               <span>{t('metric.interval')}</span>
               <span>{t('metric.collectStatus')}</span>
+              <span>{t('collectionTask.nextCollectAt')}</span>
               <span>{t('operation')}</span>
             </div>
             {tasks.configs.records.map((task) => (
@@ -278,6 +305,7 @@ export default function CollectionTaskPage() {
                 <span>{executionLabel(task.executionMode)}</span>
                 <span>{task.intervalSec || '-'}s</span>
                 <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
+                <span>{formatTime(task.nextCollectAt)}</span>
                 <span className="fp-row-actions" onClick={(event) => event.stopPropagation()}>
                   <button type="button" onClick={() => setRoute({ name: 'detail', id: task.id })}>{t('detail')}</button>
                   <button type="button" onClick={() => openEdit(task)}>{t('collectionTask.config')}</button>
@@ -293,105 +321,6 @@ export default function CollectionTaskPage() {
             onChange={(next) => loadTasks({ ...taskQuery, ...next })}
           />
         </div>
-
-        <aside className="fp-task-side">
-          <TaskStatusList
-            tasks={tasks.configs.records}
-            selectedTaskId={selectedTask && selectedTask.id}
-            executorIndex={executorIndex}
-            onSelect={setSelectedTaskId}
-            onDetail={(task) => setRoute({ name: 'detail', id: task.id })}
-            onConfig={openEdit}
-          />
-        </aside>
-      </div>
-    </section>
-  );
-}
-
-function ScopePanel({ environments, regions, scope, onSelect }) {
-  const managementRegions = regions.filter((region) => region.regionType === 'MANAGEMENT');
-
-  return (
-    <aside className="fp-infra-tree fp-task-scope">
-      <strong className="fp-infra-tree__title">{t('collectionTask.scopeTree')}</strong>
-          <button className={!scope.envId && !scope.regionId ? 'is-active' : ''} type="button" onClick={() => onSelect({})}>
-        <span>{t('collectionTask.allScope')}</span>
-        <em>{t('collectionTask.allTask')}</em>
-      </button>
-      {environments.map((environment) => (
-        <div className="fp-tree-group" key={environment.id}>
-          <button className={scope.envId === environment.id && !scope.regionId ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id })}>
-            <span>{environment.envName}</span>
-            <em>{environment.envCode}</em>
-          </button>
-          <div className="fp-tree-children">
-            {managementRegions.filter((region) => region.envId === environment.id).map((management) => (
-              <div className="fp-tree-management" key={management.id}>
-                <button className={scope.regionId === management.id ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: management.id })}>
-                  <span>{management.regionName}</span>
-                  <em>{t('managementRegion')}</em>
-                </button>
-                <div className="fp-tree-computes">
-                  {regions.filter((region) => region.parentRegionId === management.id).map((compute) => (
-                    <div className="fp-tree-compute" key={compute.id}>
-                      <button className={scope.regionId === compute.id ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: compute.id })}>
-                        <span>{compute.regionName}</span>
-                        <em>{t('computeRegion')}</em>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </aside>
-  );
-}
-
-function TaskStatusList({ tasks, selectedTaskId, executorIndex, onSelect, onDetail, onConfig }) {
-  return (
-    <section className="fp-metric-side fp-task-status-list">
-      <div className="fp-metric-side__head">
-        <div>
-          <h2>{t('collectionTask.taskStatusList')}</h2>
-          <p>{t('collectionTask.taskStatusListDesc')}</p>
-        </div>
-        <span className="fp-mini-tag">{tasks.length}</span>
-      </div>
-      <div className="fp-task-status-items">
-        {tasks.map((task) => {
-          const executor = executorIndex[task.executorNodeId];
-          return (
-            <button
-              className={`fp-task-status-card ${selectedTaskId === task.id ? 'is-selected' : ''}`}
-              type="button"
-              key={task.id}
-              onClick={() => onSelect(task.id)}
-            >
-              <span className="fp-task-status-card__head">
-                <strong>{task.objectName}</strong>
-                <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
-              </span>
-              <em>{task.metricName || task.metricCode || '-'}</em>
-              <span className="fp-task-status-card__meta">
-                <span>{executionLabel(task.executionMode)}</span>
-                <span>{executor ? executor.host : task.executorNodeId || '-'}</span>
-              </span>
-              <span className="fp-task-status-card__meta">
-                <span>{t('metric.interval')} {task.intervalSec || '-'}s</span>
-                <span>{t('collectionTask.nextCollectAt')} {formatTime(task.nextCollectAt)}</span>
-              </span>
-              <span className="fp-task-status-card__actions" onClick={(event) => event.stopPropagation()}>
-                <button type="button" onClick={() => onDetail(task)}>{t('detail')}</button>
-                <button type="button" onClick={() => onConfig(task)}>{t('collectionTask.config')}</button>
-              </span>
-            </button>
-          );
-        })}
-        {tasks.length === 0 ? <div className="fp-side-empty">{t('empty')}</div> : null}
       </div>
     </section>
   );
