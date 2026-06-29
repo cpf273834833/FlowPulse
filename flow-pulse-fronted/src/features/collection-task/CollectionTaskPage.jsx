@@ -279,6 +279,8 @@ export default function CollectionTaskPage() {
         onEdit={() => openEdit(detailTask)}
         onToggle={() => toggleTask(detailTask)}
         onDelete={() => requestDelete(detailTask)}
+        confirm={confirm}
+        onCancelConfirm={() => setConfirm(null)}
         message={message}
         messageType={messageType}
         onClearMessage={() => showMessage('')}
@@ -421,7 +423,14 @@ export default function CollectionTaskPage() {
         </aside>
       </div>
 
-      <ConfirmDialog confirm={confirm} onCancel={() => setConfirm(null)} />
+      {confirm ? (
+        <ConfirmDialog
+          title={confirm.title}
+          content={confirm.content}
+          onConfirm={confirm.onConfirm}
+          onCancel={() => setConfirm(null)}
+        />
+      ) : null}
     </section>
   );
 }
@@ -707,7 +716,7 @@ function TaskFormPage({ route, definitions, implementations, executorNodes, reso
   );
 }
 
-function TaskDetailPage({ task, metric, implementation, executor, onBack, onEdit, onToggle, onDelete, message, messageType, onClearMessage }) {
+function TaskDetailPage({ task, metric, implementation, executor, onBack, onEdit, onToggle, onDelete, confirm, onCancelConfirm, message, messageType, onClearMessage }) {
   if (!task) {
     return null;
   }
@@ -755,6 +764,14 @@ function TaskDetailPage({ task, metric, implementation, executor, onBack, onEdit
           <Info label={t('description')} value={task.description || '-'} />
         </DetailSection>
       </div>
+      {confirm ? (
+        <ConfirmDialog
+          title={confirm.title}
+          content={confirm.content}
+          onConfirm={confirm.onConfirm}
+          onCancel={onCancelConfirm}
+        />
+      ) : null}
     </section>
   );
 }
