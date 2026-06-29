@@ -127,10 +127,11 @@ export default function CollectionTaskPage() {
 
   async function loadTasks(nextQuery = taskQuery) {
     try {
-      const selectedInfra = infrastructureIndex[scope.infrastructureId];
       const query = {
         ...nextQuery,
-        objectType: selectedInfra ? selectedInfra.type : nextQuery.objectType,
+        envId: scope.envId || undefined,
+        regionId: scope.regionId || undefined,
+        infrastructureId: scope.infrastructureId || undefined,
       };
       const data = await metricApi.resourceConfigPage(normalizeQuery(query));
       setTasks(data || EMPTY_TASK_PAGE);

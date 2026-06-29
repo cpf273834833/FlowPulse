@@ -10,6 +10,9 @@ public interface ResourceMetricConfigMapper {
                                                 @Param("keyword") String keyword,
                                                 @Param("objectType") String objectType,
                                                 @Param("objectId") String objectId,
+                                                @Param("infrastructureId") String infrastructureId,
+                                                @Param("envId") String envId,
+                                                @Param("regionId") String regionId,
                                                 @Param("metricDefinitionId") String metricDefinitionId,
                                                 @Param("enabled") Boolean enabled,
                                                 @Param("offset") int offset,
@@ -19,6 +22,9 @@ public interface ResourceMetricConfigMapper {
                    @Param("keyword") String keyword,
                    @Param("objectType") String objectType,
                    @Param("objectId") String objectId,
+                   @Param("infrastructureId") String infrastructureId,
+                   @Param("envId") String envId,
+                   @Param("regionId") String regionId,
                    @Param("metricDefinitionId") String metricDefinitionId,
                    @Param("enabled") Boolean enabled);
 

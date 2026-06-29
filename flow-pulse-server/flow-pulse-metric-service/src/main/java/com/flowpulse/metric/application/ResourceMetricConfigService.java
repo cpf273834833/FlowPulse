@@ -48,9 +48,11 @@ public class ResourceMetricConfigService {
         Boolean enabled = parseEnabled(query.getEnabled());
         List<ResourceMetricConfigEntity> rows = resourceMetricConfigMapper.selectPage(
                 tenantId, trim(query.getKeyword()), upper(query.getObjectType()), trim(query.getObjectId()),
+                trim(query.getInfrastructureId()), trim(query.getEnvId()), trim(query.getRegionId()),
                 trim(query.getMetricDefinitionId()), enabled, (pageNo - 1) * pageSize, pageSize);
         long total = resourceMetricConfigMapper.countPage(
                 tenantId, trim(query.getKeyword()), upper(query.getObjectType()), trim(query.getObjectId()),
+                trim(query.getInfrastructureId()), trim(query.getEnvId()), trim(query.getRegionId()),
                 trim(query.getMetricDefinitionId()), enabled);
 
         PageResponse<ResourceMetricConfigResponse> page = new PageResponse<ResourceMetricConfigResponse>();
