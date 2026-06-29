@@ -19,10 +19,10 @@ export default function Toast({ message, type, onClose }) {
 
 function inferType(message) {
   const text = String(message || '').toLowerCase();
-  if (text.indexOf('失败') >= 0 || text.indexOf('异常') >= 0 || text.indexOf('错误') >= 0 || text.indexOf('error') >= 0 || text.indexOf('exception') >= 0) {
+  if (text.includes('失败') || text.includes('异常') || text.includes('错误') || text.includes('error') || text.includes('exception')) {
     return 'error';
   }
-  if (text.indexOf('警告') >= 0 || text.indexOf('需要') >= 0 || text.indexOf('warning') >= 0) {
+  if (text.includes('警告') || text.includes('提醒') || text.includes('需要') || text.includes('warning')) {
     return 'warning';
   }
   return 'success';
@@ -30,16 +30,16 @@ function inferType(message) {
 
 function title(type, message) {
   const text = String(message || '');
-  if (text.indexOf('连接测试通过') >= 0) {
+  if (text.includes('连接测试通过')) {
     return t('toast.connectionPassed');
   }
-  if (text.indexOf('连接测试失败') >= 0) {
+  if (text.includes('连接测试失败') || text.includes('无法连接')) {
     return t('toast.connectionFailed');
   }
-  if (text.indexOf('资源同步完成') >= 0) {
+  if (text.includes('资源同步完成')) {
     return t('toast.syncSucceeded');
   }
-  if (text.indexOf('资源同步失败') >= 0) {
+  if (text.includes('资源同步失败')) {
     return t('toast.syncFailed');
   }
   if (type === 'error') {
