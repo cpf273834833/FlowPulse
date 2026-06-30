@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.metric.infrastructure.persistence.mapper.MetricSampleMapper">
+    <resultMap id="MetricSampleMap" type="com.flowpulse.metric.domain.model.MetricSampleEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="configId" column="config_id"/>
+        <result property="metricDefinitionId" column="metric_definition_id"/>
+        <result property="metricCode" column="metric_code"/>
+        <result property="objectType" column="object_type"/>
+        <result property="objectId" column="object_id"/>
+        <result property="objectCode" column="object_code"/>
+        <result property="value" column="metric_value"/>
+        <result property="collectedAt" column="collected_at"/>
+        <result property="metadataJson" column="metadata_json"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.flowpulse.metric.domain.model.MetricSampleEntity">
+        insert into fp_metric_sample
+        (id, tenant_id, config_id, metric_definition_id, metric_code, object_type, object_id, object_code,
+         metric_value, collected_at, metadata_json, created_at)
+        values
+        (#{id}, #{tenantId}, #{configId}, #{metricDefinitionId}, #{metricCode}, #{objectType}, #{objectId}, #{objectCode},
+         #{value}, #{collectedAt}, #{metadataJson}, #{createdAt})
+    </insert>
+
+    <select id="selectLatestByConfigId" resultMap="MetricSampleMap">
+        select * from fp_metric_sample
+        where tenant_id = #{tenantId} and config_id = #{configId}
+        order by collected_at desc
+        limit 1
+    </select>
+</mapper>

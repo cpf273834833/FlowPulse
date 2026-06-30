@@ -6,7 +6,11 @@ import DeleteOutlined from '@uyun/icons/DeleteOutlined';
 import EditOutlined from '@uyun/icons/EditOutlined';
 import PlusOutlined from '@uyun/icons/PlusOutlined';
 import SearchOutlined from '@uyun/icons/SearchOutlined';
+import { alertApi } from '../../api/alertApi';
+import { executorNodeApi } from '../../api/executorNodeApi';
 import { infrastructureApi } from '../../api/infrastructureApi';
+import { metricApi } from '../../api/metricApi';
+import { thresholdApi } from '../../api/thresholdApi';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
 import Toast from '../../components/Toast';
@@ -56,6 +60,16 @@ const SYNC_MODE_OPTIONS = [
   ['REFRESH', 'infrastructure.syncModeRefresh'],
 ];
 
+const EXECUTION_OPTIONS = [['SERVER', 'SERVER'], ['SSH', 'SSH'], ['AGENT', 'AGENT'], ['EXPRESSION', 'EXPRESSION']];
+
+const QUICK_THRESHOLD_SEVERITIES = [
+  ['REMIND', 'threshold.severity.remind'],
+  ['WARNING', 'threshold.severity.warning'],
+  ['ERROR', 'threshold.severity.error'],
+  ['CRITICAL', 'threshold.severity.critical'],
+  ['URGENT', 'threshold.severity.urgent'],
+];
+
 export default function InfrastructurePage() {
   const [page, setPage] = useState(EMPTY_PAGE);
   const [query, setQuery] = useState({ pageNo: 1, pageSize: 10 });
@@ -68,14 +82,26 @@ export default function InfrastructurePage() {
   const [resources, setResources] = useState({ records: [], total: 0, pageNo: 1, pageSize: 10 });
   const [resourceQuery, setResourceQuery] = useState({ pageNo: 1, pageSize: 10 });
   const [syncMode, setSyncMode] = useState('RECONCILE');
+  const [metricDefinitions, setMetricDefinitions] = useState([]);
+  const [metricImplementations, setMetricImplementations] = useState([]);
+  const [metricConfigs, setMetricConfigs] = useState({ configs: { records: [], total: 0, pageNo: 1, pageSize: 10 } });
+  const [metricConfigQuery, setMetricConfigQuery] = useState({ pageNo: 1, pageSize: 200 });
+  const [metricConfigPage, setMetricConfigPage] = useState(null);
+  const [thresholdConfigPage, setThresholdConfigPage] = useState(null);
+  const [thresholdRules, setThresholdRules] = useState([]);
+  const [activeAlerts, setActiveAlerts] = useState([]);
+  const [listActiveAlerts, setListActiveAlerts] = useState([]);
+  const [executorNodes, setExecutorNodes] = useState([]);
 
   const envIndex = useMemo(() => indexById(page.environments), [page.environments]);
   const regionIndex = useMemo(() => indexById(page.regions), [page.regions]);
   const selectedScopeLabel = useMemo(() => scopeLabel(query, envIndex, regionIndex), [query, envIndex, regionIndex]);
   const detail = page.infrastructures.records.find((item) => item.id === detailId);
+  const listAlertsByObject = useMemo(() => groupAlertsByObject(listActiveAlerts), [listActiveAlerts]);
 
   useEffect(() => {
     load(query);
+    loadMetricOptions();
   }, []);
 
   useEffect(() => {
@@ -91,14 +117,23 @@ export default function InfrastructurePage() {
       const current = page.infrastructures.records.find((item) => item.id === detailId);
       setSyncMode((current && current.syncMode) || 'RECONCILE');
       loadResources(detailId, resourceQuery);
+      if (current) {
+        loadInfrastructureMetricConfigs(current, metricConfigQuery);
+        loadInfrastructureThresholdRules(current);
+        loadInfrastructureAlerts(current);
+      }
     }
   }, [detailId]);
 
   async function load(nextQuery = query) {
     setLoading(true);
     try {
-      const data = await infrastructureApi.page(nextQuery);
+      const [data, alertData] = await Promise.all([
+        infrastructureApi.page(nextQuery),
+        alertApi.page({ pageNo: 1, pageSize: 500, status: 'ACTIVE' }),
+      ]);
       setPage(data || EMPTY_PAGE);
+      setListActiveAlerts((alertData.alerts && alertData.alerts.records) || []);
       setQuery(nextQuery);
     } catch (error) {
       setMessage(error.message);
@@ -112,6 +147,148 @@ export default function InfrastructurePage() {
       const data = await infrastructureApi.resources(id, nextQuery);
       setResources(data || { records: [], total: 0, pageNo: 1, pageSize: 10 });
       setResourceQuery(nextQuery);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function loadMetricOptions() {
+    try {
+      const [metricPage, implementationPage, executorNodePage] = await Promise.all([
+        metricApi.page({ pageNo: 1, pageSize: 200, enabled: 'true' }),
+        metricApi.implementationPage({ pageNo: 1, pageSize: 500, enabled: 'true' }),
+        executorNodeApi.page({ pageNo: 1, pageSize: 500 }),
+      ]);
+      setMetricDefinitions((metricPage.metrics && metricPage.metrics.records) || []);
+      setMetricImplementations((implementationPage.implementations && implementationPage.implementations.records) || []);
+      setExecutorNodes((executorNodePage.nodes && executorNodePage.nodes.records) || []);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function loadInfrastructureMetricConfigs(item, nextQuery = metricConfigQuery) {
+    if (!item || !item.id) {
+      return;
+    }
+    try {
+      const data = await metricApi.resourceConfigPage({
+        ...nextQuery,
+        objectType: item.type,
+        objectId: item.id,
+      });
+      setMetricConfigs(data || { configs: { records: [], total: 0, pageNo: 1, pageSize: 10 } });
+      setMetricConfigQuery(nextQuery);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function loadInfrastructureThresholdRules(item) {
+    if (!item || !item.id) {
+      setThresholdRules([]);
+      return;
+    }
+    try {
+      const data = await thresholdApi.page({
+        pageNo: 1,
+        pageSize: 200,
+        objectType: item.type,
+        objectId: item.id,
+        scopeType: 'RESOURCE',
+      });
+      setThresholdRules((data.rules && data.rules.records) || []);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function loadInfrastructureAlerts(item) {
+    if (!item || !item.id) {
+      setActiveAlerts([]);
+      return;
+    }
+    try {
+      const data = await alertApi.page({
+        pageNo: 1,
+        pageSize: 100,
+        status: 'ACTIVE',
+        objectType: item.type,
+      });
+      const records = (data.alerts && data.alerts.records) || [];
+      setActiveAlerts(records.filter((alert) => alert.objectId === item.id));
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  function openMetricConfig(item = null, metric = null) {
+    setMetricConfigPage(item ? { mode: 'edit', form: item } : { mode: 'create', form: defaultInfrastructureMetricConfig(detail, metric) });
+  }
+
+  function openDetail(id) {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    setDetailId(id);
+  }
+
+  function openThresholdConfig(row) {
+    if (!detail || !row || !row.metric) {
+      return;
+    }
+    setThresholdConfigPage({
+      metric: row.metric,
+      config: row.config,
+      rule: row.thresholds && row.thresholds.length ? row.thresholds[0] : null,
+    });
+  }
+
+  async function saveInfrastructureMetricConfig(form) {
+    if (!detail) {
+      return;
+    }
+    if (!form.metricDefinitionId) {
+      setMessage(t('infrastructure.metricRequired'));
+      return;
+    }
+    if ((form.executionMode === 'SSH' || form.executionMode === 'AGENT') && !form.executorNodeId && form.enabled !== false) {
+      setMessage(t('metric.executorNodeRequired'));
+      return;
+    }
+    try {
+      const payload = normalizeInfrastructureMetricConfig(form, detail);
+      if (form.id) {
+        await metricApi.updateResourceConfig(form.id, payload);
+      } else {
+        await metricApi.createResourceConfig(payload);
+      }
+      setMetricConfigPage(null);
+      setMessage(t('infrastructure.metricConfigSaved'));
+      await loadInfrastructureMetricConfigs(detail, metricConfigQuery);
+      await loadInfrastructureThresholdRules(detail);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function saveQuickThreshold(form) {
+    if (!detail || !thresholdConfigPage) {
+      return;
+    }
+    const payload = normalizeQuickThreshold(form, detail, thresholdConfigPage.metric);
+    if (!payload.conditionsJson) {
+      setMessage(t('threshold.conditionRequired'));
+      return;
+    }
+    try {
+      if (thresholdConfigPage.rule && thresholdConfigPage.rule.id) {
+        await thresholdApi.update(thresholdConfigPage.rule.id, payload);
+      } else {
+        await thresholdApi.create(payload);
+      }
+      setThresholdConfigPage(null);
+      setMessage(t('threshold.saved'));
+      await loadInfrastructureThresholdRules(detail);
+      await loadInfrastructureAlerts(detail);
     } catch (error) {
       setMessage(error.message);
     }
@@ -221,7 +398,7 @@ export default function InfrastructurePage() {
     const defaultEnvId = page.environments[0] && page.environments[0].id;
     const defaultRegions = page.regions.filter((region) => !defaultEnvId || region.envId === defaultEnvId);
     setFormPage({
-      title: item ? `${t('infrastructure.edit')}：${item.name || item.code}` : t('infrastructure.add'),
+      title: item ? `${t('infrastructure.edit')}锛?{item.name || item.code}` : t('infrastructure.add'),
       form: item
         ? normalizeFormByAuth({ ...DEFAULT_FORM, ...item })
         : { ...DEFAULT_FORM, envId: defaultEnvId, regionId: defaultRegions[0] && defaultRegions[0].id },
@@ -261,56 +438,123 @@ export default function InfrastructurePage() {
     );
   }
 
-  if (detail) {
+  if (detail && metricConfigPage) {
     return (
-      <section className="fp-page">
-        <button className="fp-link-button fp-back-link" type="button" onClick={() => setDetailId('')}>
+      <InfrastructureMetricConfigPage
+        detail={detail}
+        env={envIndex[detail.envId]}
+        region={regionIndex[detail.regionId]}
+        formPage={metricConfigPage}
+        metrics={metricDefinitions}
+        implementations={metricImplementations}
+        executorNodes={executorNodes}
+        onBack={() => setMetricConfigPage(null)}
+        onSubmit={saveInfrastructureMetricConfig}
+        message={message}
+        onClearMessage={() => setMessage('')}
+      />
+    );
+  }
+
+  if (detail && thresholdConfigPage) {
+    return (
+      <InfrastructureThresholdConfigPage
+        detail={detail}
+        env={envIndex[detail.envId]}
+        region={regionIndex[detail.regionId]}
+        configPage={thresholdConfigPage}
+        onBack={() => setThresholdConfigPage(null)}
+        onSubmit={saveQuickThreshold}
+        message={message}
+        onClearMessage={() => setMessage('')}
+      />
+    );
+  }
+
+  if (detail) {
+    const highestAlert = highestActiveAlert(activeAlerts);
+    return (
+      <section className="fp-page fp-infra-detail-page">
+        <button className="fp-link-button fp-back-link fp-infra-back" type="button" onClick={() => setDetailId('')}>
           {t('infrastructure.back')}
         </button>
-        <div className="fp-detail-hero">
-          <div>
-            <span className="fp-kicker">{detail.type}</span>
-            <h1>{detail.name}</h1>
+        <div className="fp-infra-detail-hero">
+          <div className={`fp-infra-avatar fp-infra-avatar--${detail.type.toLowerCase()}`}>{detail.type.slice(0, 2)}</div>
+          <div className="fp-infra-detail-title">
+            <div className="fp-infra-title-row">
+              <h1>{detail.name}</h1>
+              <span className={`fp-type-tag fp-type-tag--${detail.type.toLowerCase()}`}>{detail.type}</span>
+              {highestAlert ? <span className={`fp-infra-alert-chip is-${highestAlert.currentLevel}`}>{levelText(highestAlert.currentLevel)}</span> : null}
+            </div>
             <p>{detail.description || t('infrastructure.noDescription')}</p>
+            {activeAlerts.length > 0 ? <ActiveAlertList alerts={activeAlerts} /> : null}
+            <div className="fp-infra-hero-meta">
+              <span>{detail.code}</span>
+              <span>{envIndex[detail.envId]?.envName || '-'}</span>
+              <span>{regionIndex[detail.regionId]?.regionName || '-'}</span>
+            </div>
           </div>
-          <div className="fp-actions fp-actions--wrap">
-            <StatusPill status={detail.connectionStatus} />
-            <button className="fp-button" type="button" onClick={() => openForm(detail)}><EditOutlined />{t('edit')}</button>
-            <button className={`fp-button ${testingId === detail.id ? 'is-loading' : ''}`} type="button" disabled={testingId === detail.id} onClick={() => test(detail)}>
-              <ApiOutlined />{testingId === detail.id ? t('infrastructure.testing') : t('infrastructure.test')}
-            </button>
-            <button className="fp-button fp-button--ghost-danger" type="button" onClick={() => requestDelete(detail)}><DeleteOutlined />{t('delete')}</button>
-          </div>
+          <aside className="fp-infra-action-panel">
+            <div className="fp-infra-action-panel__top">
+              <StatusPill status={detail.connectionStatus} />
+              <button className={`fp-switch ${detail.runStatus === 'ENABLED' ? 'is-on' : ''}`} type="button" onClick={() => toggleRun(detail)}>
+                <span />
+                {detail.runStatus === 'ENABLED' ? t('infrastructure.runEnabled') : t('infrastructure.runDisabled')}
+              </button>
+            </div>
+            <div className="fp-infra-action-panel__endpoint">
+              <span>{connectionEndpointLabel(detail.type)}</span>
+              <strong>{detail.endpoint}</strong>
+              <CopyButton value={detail.endpoint} onCopy={copyText} />
+            </div>
+            <div className="fp-infra-action-panel__mini">
+              <span>{t('infrastructure.authType')}</span>
+              <strong>{detail.authType || 'NONE'}</strong>
+            </div>
+            <div className="fp-infra-action-panel__time">
+              <span>{t('infrastructure.lastTest')}</span>
+              <strong>{formatTime(detail.lastTestAt)}</strong>
+            </div>
+            <div className="fp-infra-action-panel__mini">
+              <span>{t('infrastructure.lastTestMessage')}</span>
+              <strong>{normalizeActionMessage(detail.lastTestMessage) || '-'}</strong>
+            </div>
+            <div className="fp-actions fp-actions--wrap">
+              <button className="fp-button" type="button" onClick={() => openForm(detail)}><EditOutlined />{t('edit')}</button>
+              <button className={`fp-button ${testingId === detail.id ? 'is-loading' : ''}`} type="button" disabled={testingId === detail.id} onClick={() => test(detail)}>
+                <ApiOutlined />{testingId === detail.id ? t('infrastructure.testing') : t('infrastructure.test')}
+              </button>
+              <button className="fp-button fp-button--ghost-danger" type="button" onClick={() => requestDelete(detail)}><DeleteOutlined />{t('delete')}</button>
+            </div>
+          </aside>
         </div>
 
         <Toast message={message} onClose={() => setMessage('')} />
 
-        <div className="fp-detail-sections">
-          <DetailSection title={t('infrastructure.basicInfo')}>
-            <Info label={t('infrastructure.code')} value={detail.code} />
-            <Info label={t('infrastructure.type')} value={detail.type} />
-            <Info label={t('regionEnv')} value={envIndex[detail.envId]?.envName || '-'} />
-            <Info label={t('infrastructure.region')} value={regionIndex[detail.regionId]?.regionName || '-'} />
-            <Info label={t('description')} value={detail.description || t('infrastructure.noDescription')} />
-          </DetailSection>
-          <DetailSection title={t('infrastructure.connectionInfo')}>
-            <Info label={connectionEndpointLabel(detail.type)} value={detail.endpoint} action={<CopyButton value={detail.endpoint} onCopy={copyText} />} />
-            <Info label={t('infrastructure.authType')} value={detail.authType || 'NONE'} />
-            <Info label={t('infrastructure.username')} value={detail.username || '-'} />
-            <Info label={t('infrastructure.password')} value={detail.password ? '******' : '-'} />
-            <Info label={t('infrastructure.lastTest')} value={formatTime(detail.lastTestAt)} />
-            <Info label={t('infrastructure.lastTestMessage')} value={normalizeActionMessage(detail.lastTestMessage) || '-'} />
-          </DetailSection>
-          <DetailSection title={t('infrastructure.syncConfig')}>
-            <Info label={t('infrastructure.syncScope')} value={detail.syncScope || '*'} />
-            <Info label={t('infrastructure.syncInterval')} value={`${detail.syncIntervalSec || 0}s`} />
-            <Info label={t('infrastructure.syncEnabled')} value={detail.syncEnabled ? t('yes') : t('no')} />
-            <Info label={t('infrastructure.lastSync')} value={formatTime(detail.lastSyncAt)} />
-            <Info label={t('infrastructure.lastSyncMessage')} value={normalizeActionMessage(detail.lastSyncMessage) || '-'} />
-          </DetailSection>
-        </div>
+        <div className="fp-infra-detail-grid">
+          <main className="fp-infra-detail-main">
+        <InfrastructureMetricBoard
+          detail={detail}
+          metrics={filterInfrastructureMetrics(metricDefinitions, detail.type)}
+          configs={metricConfigs.configs.records}
+          thresholds={thresholdRules}
+          alerts={activeAlerts}
+          executorNodes={executorNodes}
+          onAdd={(metric) => openMetricConfig(null, metric)}
+          onEdit={(config) => openMetricConfig(config)}
+          onThreshold={openThresholdConfig}
+        />
 
-        <section className="fp-card fp-resource-card">
+            <section className="fp-infra-config-board">
+              <ConfigBlock title={t('infrastructure.syncConfig')}>
+                <Info label={t('infrastructure.syncScope')} value={detail.syncScope || '*'} />
+                <Info label={t('infrastructure.syncInterval')} value={`${detail.syncIntervalSec || 0}s`} />
+                <Info label={t('infrastructure.syncEnabled')} value={detail.syncEnabled ? t('yes') : t('no')} />
+                <Info label={t('infrastructure.lastSync')} value={formatTime(detail.lastSyncAt)} />
+              </ConfigBlock>
+            </section>
+
+        <section className="fp-card fp-resource-card fp-infra-work-card">
           <div className="fp-section-title">
           <h2>{t('infrastructure.resources')}</h2>
           <div className="fp-resource-toolbar">
@@ -351,6 +595,8 @@ export default function InfrastructurePage() {
             onChange={(next) => loadResources(detail.id, { ...resourceQuery, ...next })}
           />
         </section>
+          </main>
+        </div>
         {confirm ? <ConfirmDialog title={confirm.title} content={confirm.content} onCancel={() => setConfirm(null)} onConfirm={confirm.onConfirm} /> : null}
       </section>
     );
@@ -414,11 +660,13 @@ export default function InfrastructurePage() {
             </div>
             <div className="fp-infra-grid">
               {page.infrastructures.records.length === 0 ? <div className="fp-empty">{t('empty')}</div> : null}
-              {page.infrastructures.records.map((item) => (
-                <article className="fp-infra-card" key={item.id}>
+              {page.infrastructures.records.map((item) => {
+                const cardAlert = listAlertsByObject[item.id];
+                return (
+                <article className={`fp-infra-card ${cardAlert ? `is-alert is-${cardAlert.currentLevel}` : ''}`} key={item.id}>
                   <div className="fp-infra-card__top">
-                    <div>
-                      <button className="fp-card-title-button" type="button" onClick={() => setDetailId(item.id)}>
+                    <div className="fp-infra-card__identity">
+                      <button className="fp-card-title-button" type="button" onClick={() => openDetail(item.id)}>
                         {item.name}
                       </button>
                       <span className={`fp-type-tag fp-type-tag--${item.type.toLowerCase()}`}>{item.type}</span>
@@ -430,15 +678,18 @@ export default function InfrastructurePage() {
                     </button>
                   </div>
                   <div className="fp-infra-status-line">
-                    <StatusPill status={item.connectionStatus} />
+                    <div className="fp-infra-card-statuses">
+                      <StatusPill status={item.connectionStatus} />
+                      {cardAlert ? <span className={`fp-infra-alert-chip fp-infra-alert-chip--compact is-${cardAlert.currentLevel}`}>{levelText(cardAlert.currentLevel)}</span> : null}
+                    </div>
                     <button className={`fp-button fp-button--small ${testingId === item.id ? 'is-loading' : ''}`} type="button" disabled={testingId === item.id} onClick={() => test(item)}>
                       {testingId === item.id ? t('infrastructure.testing') : t('infrastructure.test')}
                     </button>
                   </div>
                   <div className="fp-infra-meta">
-                    <span>{`${envIndex[item.envId]?.envName || '-'} / ${regionIndex[item.regionId]?.regionName || '-'}`}</span>
-                    <span>{t('infrastructure.syncScope')} {item.syncScope || '*'}</span>
-                    <span>{t('infrastructure.lastSync')} {formatTime(item.lastSyncAt)}</span>
+                    <span title={`${envIndex[item.envId]?.envName || '-'} / ${regionIndex[item.regionId]?.regionName || '-'}`}>{`${envIndex[item.envId]?.envName || '-'} / ${regionIndex[item.regionId]?.regionName || '-'}`}</span>
+                    <span title={`${t('infrastructure.syncScope')} ${item.syncScope || '*'}`}>{t('infrastructure.syncScope')} {item.syncScope || '*'}</span>
+                    <span title={`${t('infrastructure.lastSync')} ${formatTime(item.lastSyncAt)}`}>{t('infrastructure.lastSync')} {formatTime(item.lastSyncAt)}</span>
                   </div>
                   <div className="fp-infra-endpoint">
                     <span>{item.endpoint}</span>
@@ -446,7 +697,8 @@ export default function InfrastructurePage() {
                   </div>
                   <p>{item.description || t('infrastructure.noDescription')}</p>
                 </article>
-              ))}
+                );
+              })}
             </div>
             <Pagination
               pageNo={page.infrastructures.pageNo}
@@ -468,52 +720,418 @@ function InfrastructureFormPage({ dialog, setDialog, onSubmit, page, onBack, mes
   const authType = form.authType || 'NONE';
   const isEdit = Boolean(form.id);
   return (
-    <section className="fp-page">
-      <button className="fp-link-button fp-back-link" type="button" onClick={onBack}>
+    <section className="fp-page fp-infra-config-page">
+      <button className="fp-link-button fp-back-link fp-infra-back" type="button" onClick={onBack}>
         {t('infrastructure.back')}
       </button>
-      <div className="fp-form-header">
-        <div>
+      <Toast message={message} onClose={onClearMessage} />
+      <div className="fp-infra-config-shell">
+        <aside className="fp-infra-config-aside">
           <span className="fp-kicker">{form.id ? t('infrastructure.edit') : t('infrastructure.add')}</span>
           <h1>{dialog.title}</h1>
           <p>{isEdit ? t('infrastructure.editImmutableHint') : t('infrastructure.formPageDesc')}</p>
-        </div>
-        <div className="fp-actions fp-actions--wrap">
-          <button className="fp-button" type="button" onClick={() => setDialog(null)}>{t('cancel')}</button>
-          <button className="fp-button fp-button--primary" type="button" onClick={() => onSubmit(normalizeFormByAuth(form))}>{t('save')}</button>
+          <div className="fp-infra-config-preview">
+            <span className={`fp-type-tag fp-type-tag--${(form.type || 'KAFKA').toLowerCase()}`}>{form.type}</span>
+            <strong>{form.name || t('infrastructure.name')}</strong>
+            <em>{form.code || t('infrastructure.code')}</em>
+            <small>{form.endpoint || t('infrastructure.endpoint')}</small>
+          </div>
+          <div className="fp-actions fp-actions--stack">
+            <button className="fp-button fp-button--primary" type="button" onClick={() => onSubmit(normalizeFormByAuth(form))}>{t('save')}</button>
+            <button className="fp-button" type="button" onClick={() => setDialog(null)}>{t('cancel')}</button>
+          </div>
+        </aside>
+        <div className="fp-infra-config-main">
+          <FormGroup title={t('infrastructure.basicSection')} desc={t('infrastructure.basicSectionDesc')}>
+            <FieldSelect label={t('infrastructure.type')} value={form.type} options={TYPE_OPTIONS} onChange={(type) => setForm({ ...form, type })} disabled={isEdit} />
+            <Field label={t('infrastructure.code')} value={form.code} onChange={(code) => setForm({ ...form, code })} disabled={isEdit} />
+            <Field label={t('infrastructure.name')} value={form.name} onChange={(name) => setForm({ ...form, name })} />
+            <FieldSelect label={t('regionEnv')} value={form.envId} options={page.environments.map((env) => [env.id, env.envName])} disabled={isEdit} onChange={(envId) => {
+              const nextRegions = page.regions.filter((region) => region.envId === envId);
+              setForm({ ...form, envId, regionId: nextRegions[0] && nextRegions[0].id });
+            }} />
+            <FieldSelect label={t('infrastructure.region')} value={form.regionId} options={regions.map((region) => [region.id, region.regionName])} onChange={(regionId) => setForm({ ...form, regionId })} disabled={isEdit} />
+            <Field label={t('description')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
+          </FormGroup>
+          <FormGroup title={t('infrastructure.connectionInfo')} desc={endpointHint(form.type)}>
+            <Field label={t('infrastructure.endpoint')} value={form.endpoint} onChange={(endpoint) => setForm({ ...form, endpoint })} hint={endpointHint(form.type)} />
+            <FieldSelect label={t('infrastructure.authType')} value={authType} options={[['NONE', 'NONE'], ['BASIC', 'BASIC'], ['API_KEY', 'API_KEY']]} onChange={(nextAuthType) => setForm(normalizeFormByAuth({ ...form, authType: nextAuthType }))} />
+            <Field label={t('infrastructure.username')} value={authType === 'BASIC' ? form.username : ''} onChange={(username) => setForm({ ...form, username })} disabled={authType !== 'BASIC'} />
+            <Field label={t('infrastructure.password')} value={authType === 'BASIC' ? form.password : ''} onChange={(password) => setForm({ ...form, password })} type="password" disabled={authType !== 'BASIC'} autoComplete="new-password" />
+            <Field label={t('infrastructure.apiKey')} value={authType === 'API_KEY' ? form.apiKey : ''} onChange={(apiKey) => setForm({ ...form, apiKey })} disabled={authType !== 'API_KEY'} />
+          </FormGroup>
+          <FormGroup title={t('infrastructure.syncSection')} desc={t('infrastructure.syncSectionDesc')}>
+            <Field label={t('infrastructure.syncScope')} value={form.syncScope} onChange={(syncScope) => setForm({ ...form, syncScope })} hint={t('infrastructure.syncScopeHint')} />
+            <FieldSelect label={t('infrastructure.syncMode')} value={form.syncMode || 'RECONCILE'} options={SYNC_MODE_OPTIONS} onChange={(syncMode) => setForm({ ...form, syncMode })} />
+            <Field label={t('infrastructure.syncInterval')} value={form.syncIntervalSec} onChange={(syncIntervalSec) => setForm({ ...form, syncIntervalSec: Number(syncIntervalSec) })} type="number" />
+          </FormGroup>
         </div>
       </div>
-      <section className="fp-card">
-        <Toast message={message} onClose={onClearMessage} />
-        <div className="fp-form fp-form--page">
-        <div className="fp-form-section">
-          <strong>{t('infrastructure.basicSection')}</strong>
-          <span>{t('infrastructure.basicSectionDesc')}</span>
-        </div>
-        <FieldSelect label={t('infrastructure.type')} value={form.type} options={TYPE_OPTIONS} onChange={(type) => setForm({ ...form, type })} disabled={isEdit} />
-        <Field label={t('infrastructure.code')} value={form.code} onChange={(code) => setForm({ ...form, code })} disabled={isEdit} />
-        <Field label={t('infrastructure.name')} value={form.name} onChange={(name) => setForm({ ...form, name })} />
-        <FieldSelect label={t('regionEnv')} value={form.envId} options={page.environments.map((env) => [env.id, env.envName])} disabled={isEdit} onChange={(envId) => {
-          const nextRegions = page.regions.filter((region) => region.envId === envId);
-          setForm({ ...form, envId, regionId: nextRegions[0] && nextRegions[0].id });
-        }} />
-        <FieldSelect label={t('infrastructure.region')} value={form.regionId} options={regions.map((region) => [region.id, region.regionName])} onChange={(regionId) => setForm({ ...form, regionId })} disabled={isEdit} />
-        <Field label={t('infrastructure.endpoint')} value={form.endpoint} onChange={(endpoint) => setForm({ ...form, endpoint })} hint={endpointHint(form.type)} />
-        <FieldSelect label={t('infrastructure.authType')} value={authType} options={[['NONE', 'NONE'], ['BASIC', 'BASIC'], ['API_KEY', 'API_KEY']]} onChange={(nextAuthType) => setForm(normalizeFormByAuth({ ...form, authType: nextAuthType }))} />
-        <Field label={t('infrastructure.username')} value={authType === 'BASIC' ? form.username : ''} onChange={(username) => setForm({ ...form, username })} disabled={authType !== 'BASIC'} />
-        <Field label={t('infrastructure.password')} value={authType === 'BASIC' ? form.password : ''} onChange={(password) => setForm({ ...form, password })} type="password" disabled={authType !== 'BASIC'} autoComplete="new-password" />
-        <Field label={t('infrastructure.apiKey')} value={authType === 'API_KEY' ? form.apiKey : ''} onChange={(apiKey) => setForm({ ...form, apiKey })} disabled={authType !== 'API_KEY'} />
-        <div className="fp-form-section">
-          <strong>{t('infrastructure.syncSection')}</strong>
-          <span>{t('infrastructure.syncSectionDesc')}</span>
-        </div>
-        <Field label={t('infrastructure.syncScope')} value={form.syncScope} onChange={(syncScope) => setForm({ ...form, syncScope })} hint={t('infrastructure.syncScopeHint')} />
-        <FieldSelect label={t('infrastructure.syncMode')} value={form.syncMode || 'RECONCILE'} options={SYNC_MODE_OPTIONS} onChange={(syncMode) => setForm({ ...form, syncMode })} />
-        <Field label={t('infrastructure.syncInterval')} value={form.syncIntervalSec} onChange={(syncIntervalSec) => setForm({ ...form, syncIntervalSec: Number(syncIntervalSec) })} type="number" />
-        <Field label={t('description')} value={form.description} onChange={(description) => setForm({ ...form, description })} />
-        </div>
-      </section>
     </section>
+  );
+}
+
+function InfrastructureMetricConfigPage({ detail, env, region, formPage, metrics, implementations, executorNodes, onBack, onSubmit, message, onClearMessage }) {
+  const [form, setForm] = useState(formPage.form);
+  const availableMetrics = useMemo(() => filterInfrastructureMetrics(metrics, detail.type), [metrics, detail.type]);
+  const availableImplementations = useMemo(
+    () => implementations.filter((item) => item.metricDefinitionId === form.metricDefinitionId),
+    [implementations, form.metricDefinitionId],
+  );
+  const availableExecutorNodes = useMemo(
+    () => filterExecutorNodes(executorNodes, detail, form.executionMode),
+    [executorNodes, detail, form.executionMode],
+  );
+  const selectedMetric = availableMetrics.find((item) => item.id === form.metricDefinitionId);
+  const title = formPage.mode === 'edit' ? t('infrastructure.editMetricConfig') : t('infrastructure.addMetricConfig');
+  const needExecutorNode = form.executionMode === 'SSH' || form.executionMode === 'AGENT';
+
+  return (
+    <section className="fp-page fp-infra-config-page">
+      <button className="fp-link-button fp-back-link fp-infra-back" type="button" onClick={onBack}>
+        {t('infrastructure.backToDetail')}
+      </button>
+      <Toast message={message} onClose={onClearMessage} />
+      <div className="fp-infra-config-shell">
+        <aside className="fp-infra-config-aside">
+          <span className="fp-kicker">{t('infrastructure.metricConfig')}</span>
+          <h1>{title}</h1>
+          <p>{t('infrastructure.metricConfigPageDesc', detail.name)}</p>
+          <div className="fp-infra-config-preview">
+            <span className={`fp-type-tag fp-type-tag--${detail.type.toLowerCase()}`}>{detail.type}</span>
+            <strong>{detail.name}</strong>
+            <em>{detail.code}</em>
+            <small>{env?.envName || '-'} / {region?.regionName || '-'}</small>
+          </div>
+          <div className="fp-infra-metric-preview">
+            <span>{t('metric.name')}</span>
+            <strong>{selectedMetric ? selectedMetric.metricName : t('selectPlaceholder')}</strong>
+            <em>{selectedMetric ? selectedMetric.metricCode : '-'}</em>
+          </div>
+          <div className="fp-actions fp-actions--stack">
+          <button className="fp-button fp-button--primary" type="button" onClick={() => onSubmit(form)}>{t('save')}</button>
+            <button className="fp-button" type="button" onClick={onBack}>{t('cancel')}</button>
+          </div>
+        </aside>
+
+        <main className="fp-infra-config-main">
+          <FormGroup title={t('infrastructure.metricObject')} desc={t('infrastructure.metricConfigDesc')}>
+            <Info label={t('infrastructure.name')} value={detail.name} />
+            <Info label={t('infrastructure.code')} value={detail.code} />
+            <Info label={t('infrastructure.type')} value={detail.type} />
+            <Info label={t('regionEnv')} value={env?.envName || '-'} />
+            <Info label={t('infrastructure.region')} value={region?.regionName || '-'} />
+            <Info label={t('infrastructure.endpoint')} value={detail.endpoint} />
+          </FormGroup>
+          <FormGroup title={t('infrastructure.metricCollectConfig')} desc={t('infrastructure.metricParameterDesc')}>
+            <FieldSelect
+              label={t('metric.name')}
+              value={form.metricDefinitionId}
+              options={availableMetrics.map((item) => [item.id, `${item.metricName} / ${item.metricCode}`])}
+              onChange={(metricDefinitionId) => setForm({ ...form, metricDefinitionId, implementationId: '' })}
+            />
+            <FieldSelect
+              label={t('metric.implementation')}
+              value={form.implementationId || ''}
+              options={[['', 'metric.useDefaultImplementation']].concat(availableImplementations.map((item) => [item.id, item.implementationName]))}
+              onChange={(implementationId) => setForm({ ...form, implementationId })}
+            />
+            <FieldSelect
+              label={t('metric.executionMode')}
+              value={form.executionMode || 'SSH'}
+              options={EXECUTION_OPTIONS}
+              onChange={(executionMode) => setForm({ ...form, executionMode, executorNodeId: executionMode === 'SERVER' || executionMode === 'EXPRESSION' ? '' : form.executorNodeId })}
+            />
+            {needExecutorNode ? (
+              <FieldSelect
+                label={t('collectionTask.executorNode')}
+                value={form.executorNodeId || ''}
+                options={availableExecutorNodes.map((item) => [item.id, executorNodeOptionLabel(item)])}
+                onChange={(executorNodeId) => setForm({ ...form, executorNodeId })}
+              />
+            ) : null}
+            <Field
+              label={t('metric.interval')}
+              type="number"
+              value={form.intervalSec || 60}
+              onChange={(intervalSec) => setForm({ ...form, intervalSec: Number(intervalSec) })}
+            />
+            <FieldSelect
+              label={t('metric.status')}
+              value={String(form.enabled !== false)}
+              options={[['true', 'metric.enabled'], ['false', 'metric.disabled']]}
+              onChange={(enabled) => setForm({ ...form, enabled: enabled === 'true' })}
+            />
+            <Field label={t('description')} value={form.description || ''} onChange={(description) => setForm({ ...form, description })} />
+            <label className="fp-field fp-field--wide">
+              <span>{t('metric.parameterJson')}</span>
+              <textarea
+                value={form.parameterJson || ''}
+                onChange={(event) => setForm({ ...form, parameterJson: event.target.value })}
+                placeholder={selectedMetric ? t('infrastructure.metricParameterHint') : t('selectPlaceholder')}
+              />
+              <em>{t('infrastructure.metricParameterDesc')}</em>
+            </label>
+          </FormGroup>
+        </main>
+        </div>
+    </section>
+  );
+}
+
+function InfrastructureThresholdConfigPage({ detail, env, region, configPage, onBack, onSubmit, message, onClearMessage }) {
+  const { metric, config, rule } = configPage;
+  const [form, setForm] = useState(() => defaultQuickThresholdForm(detail, metric, rule));
+  const currentValue = config && config.currentValue !== undefined && config.currentValue !== null
+    ? formatMetricValue(config.currentValue, metric.valuePrecision)
+    : t('infrastructure.noMetricValue');
+
+  function updateCondition(severity, patch) {
+    setForm((current) => ({
+      ...current,
+      conditions: current.conditions.map((item) => (item.severity === severity ? { ...item, ...patch } : item)),
+    }));
+  }
+
+  return (
+    <section className="fp-page fp-infra-config-page">
+      <button className="fp-link-button fp-back-link fp-infra-back" type="button" onClick={onBack}>
+        {t('infrastructure.backToDetail')}
+      </button>
+      <Toast message={message} onClose={onClearMessage} />
+      <div className="fp-infra-config-shell fp-threshold-config-shell">
+        <aside className="fp-infra-config-aside">
+          <span className="fp-kicker">{t('infrastructure.threshold')}</span>
+          <h1>{rule ? t('infrastructure.editThreshold') : t('infrastructure.configureThreshold')}</h1>
+          <p>{t('threshold.quickPageDesc')}</p>
+          <div className="fp-infra-config-preview">
+            <span className={`fp-type-tag fp-type-tag--${detail.type.toLowerCase()}`}>{detail.type}</span>
+            <strong>{detail.name}</strong>
+            <em>{detail.code}</em>
+            <small>{env?.envName || '-'} / {region?.regionName || '-'}</small>
+          </div>
+          <div className="fp-infra-metric-preview">
+            <span>{t('metric.name')}</span>
+            <strong>{metric.metricName}</strong>
+            <em>{metric.metricCode}</em>
+            <small>{t('infrastructure.currentMetricValue')}: {currentValue}{metric.valueUnit ? ` ${metric.valueUnit}` : ''}</small>
+          </div>
+          <div className="fp-actions fp-actions--stack">
+            <button className="fp-button fp-button--primary" type="button" onClick={() => onSubmit(form)}>{t('save')}</button>
+            <button className="fp-button" type="button" onClick={onBack}>{t('cancel')}</button>
+          </div>
+        </aside>
+
+        <main className="fp-infra-config-main">
+          <FormGroup title={t('threshold.quickScope')} desc={t('threshold.quickScopeDesc')}>
+            <Info label={t('metric.name')} value={`${metric.metricName} / ${metric.metricCode}`} />
+            <Info label={t('infrastructure.name')} value={detail.name} />
+            <Info label={t('infrastructure.code')} value={detail.code} />
+            <Info label={t('infrastructure.currentMetricValue')} value={`${currentValue}${metric.valueUnit ? ` ${metric.valueUnit}` : ''}`} />
+          </FormGroup>
+          <FormGroup title={t('threshold.quickRules')} desc={t('threshold.quickRulesDesc')}>
+            <div className="fp-threshold-step-table">
+              <div className="fp-threshold-step-row fp-threshold-step-row--head">
+                <span>{t('threshold.severity')}</span>
+                <span>{t('status')}</span>
+                <span>{t('threshold.operator')}</span>
+                <span>{t('threshold.value')}</span>
+              </div>
+              {form.conditions.map((condition) => (
+                <div className={`fp-threshold-step-row ${condition.enabled ? 'is-enabled' : ''}`} key={condition.severity}>
+                  <strong>{t(severityLabel(condition.severity))}</strong>
+                  <label className="fp-switch-line">
+                    <input type="checkbox" checked={condition.enabled} onChange={(event) => updateCondition(condition.severity, { enabled: event.target.checked })} />
+                    <span>{condition.enabled ? t('enabled') : t('disabled')}</span>
+                  </label>
+                  <select value={condition.operator} onChange={(event) => updateCondition(condition.severity, { operator: event.target.value })} disabled={!condition.enabled}>
+                    <option value=">">&gt;</option>
+                    <option value=">=">&gt;=</option>
+                    <option value="<">&lt;</option>
+                    <option value="<=">&lt;=</option>
+                    <option value="==">=</option>
+                    <option value="!=">!=</option>
+                  </select>
+                  <input
+                    type="number"
+                    value={condition.value}
+                    disabled={!condition.enabled}
+                    onChange={(event) => updateCondition(condition.severity, { value: event.target.value })}
+                    placeholder={t('threshold.valuePlaceholder')}
+                  />
+                </div>
+              ))}
+            </div>
+          </FormGroup>
+          <FormGroup title={t('threshold.judgementPolicy')} desc={t('threshold.judgementPolicyDesc')}>
+            <Field label={t('threshold.ruleName')} value={form.ruleName} onChange={(ruleName) => setForm({ ...form, ruleName })} />
+            <Field label={t('threshold.evaluationWindow')} type="number" value={form.evaluationWindowSec} onChange={(evaluationWindowSec) => setForm({ ...form, evaluationWindowSec: Number(evaluationWindowSec) })} hint={t('threshold.evaluationWindowHint')} />
+            <Field label={t('threshold.consecutiveCount')} type="number" value={form.consecutiveCount} onChange={(consecutiveCount) => setForm({ ...form, consecutiveCount: Number(consecutiveCount) })} />
+            <FieldSelect label={t('threshold.recoveryPolicy')} value={form.recoveryPolicy} options={[['AUTO', 'threshold.recoveryAuto'], ['MANUAL', 'threshold.recoveryManual']]} onChange={(recoveryPolicy) => setForm({ ...form, recoveryPolicy })} />
+            <FieldSelect label={t('metric.status')} value={String(form.enabled)} options={[['true', 'metric.enabled'], ['false', 'metric.disabled']]} onChange={(enabled) => setForm({ ...form, enabled: enabled === 'true' })} />
+            <Field label={t('description')} value={form.description || ''} onChange={(description) => setForm({ ...form, description })} />
+          </FormGroup>
+        </main>
+      </div>
+    </section>
+  );
+}
+
+function InfrastructureMetricBoard({ detail, metrics, configs, thresholds, alerts, executorNodes, onAdd, onEdit, onThreshold }) {
+  const objectConfigs = configs.filter((config) => !detail || (config.objectType === detail.type && config.objectId === detail.id));
+  const rows = buildMetricRows(metrics, objectConfigs, thresholds);
+  const executorIndex = useMemo(() => indexById(executorNodes || []), [executorNodes]);
+  const alertsByMetric = useMemo(() => groupAlertsByMetric(alerts || []), [alerts]);
+  const enabledCount = rows.filter((row) => row.config && row.config.enabled !== false).length;
+  const thresholdCount = rows.filter((row) => row.thresholds.length > 0).length;
+  const abnormalCount = rows.filter((row) => row.config && row.config.lastCollectStatus === 'ERROR').length;
+  const alertCount = (alerts || []).length;
+
+  return (
+    <section className="fp-card fp-infra-metric-board fp-infra-work-card">
+      <div className="fp-infra-metric-board__head">
+        <div>
+          <h2>{t('infrastructure.metricConfig')}</h2>
+          <p>{t('infrastructure.metricConfigDesc')}</p>
+        </div>
+        <div className="fp-infra-metric-summary">
+          <MetricSummaryItem value={rows.length} label={t('infrastructure.metricAvailable')} />
+          <MetricSummaryItem value={enabledCount} label={t('infrastructure.metricEnabled')} tone="success" />
+          <MetricSummaryItem value={thresholdCount} label={t('infrastructure.metricThresholdConfigured')} tone="warning" />
+          <MetricSummaryItem value={abnormalCount} label={t('infrastructure.metricAbnormal')} tone="danger" />
+          <MetricSummaryItem value={alertCount} label={t('infrastructure.activeAlertCount')} tone="danger" />
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="fp-empty">{t('infrastructure.noMetricDefinition')}</div>
+      ) : (
+        <div className="fp-infra-metric-grid">
+          {rows.map((row) => <InfrastructureMetricCard key={row.metric.id} row={row} alert={alertsByMetric[row.metric.id]} executorIndex={executorIndex} onAdd={onAdd} onEdit={onEdit} onThreshold={onThreshold} />)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MetricSummaryItem({ value, label, tone = '' }) {
+  return (
+    <div className={`fp-infra-metric-summary__item ${tone ? `is-${tone}` : ''}`}>
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function InfrastructureMetricCard({ row, alert, executorIndex, onAdd, onEdit, onThreshold }) {
+  const { metric, config, thresholds } = row;
+  const enabled = Boolean(config && config.enabled !== false);
+  const collectError = Boolean(config && config.lastCollectStatus === 'ERROR');
+  const hasAlert = Boolean(alert && alert.status === 'ACTIVE' && alert.currentLevel !== 'NORMAL');
+  const thresholdText = thresholds.length ? summarizeThreshold(thresholds[0]) : t('infrastructure.thresholdNotConfigured');
+  const collectStatus = config ? labelCollect(config.lastCollectStatus) : t('infrastructure.metricNotEnabled');
+  const executorNode = config && config.executorNodeId ? executorIndex[config.executorNodeId] : null;
+  const executorText = config && config.executionMode === 'SSH'
+    ? (executorNode ? executorNode.host : t('metric.executorNodeMissing'))
+    : '-';
+  const valueUnit = metric.valueUnit || '';
+  const currentValue = config && config.currentValue !== undefined && config.currentValue !== null
+    ? formatMetricValue(config.currentValue, metric.valuePrecision)
+    : t('infrastructure.noMetricValue');
+
+  return (
+    <article className={`fp-infra-metric-tile ${enabled ? 'is-enabled' : 'is-disabled'} ${collectError ? 'is-error' : ''} ${hasAlert ? `is-alert is-${alert.currentLevel}` : ''}`}>
+      <div className="fp-infra-metric-tile__top">
+        <div>
+          <h3>{metric.metricName}</h3>
+          <em>{metric.metricCode}</em>
+        </div>
+        <div className="fp-infra-metric-badges">
+          {hasAlert ? <span className={`fp-infra-metric-state is-alert is-${alert.currentLevel}`}>{levelText(alert.currentLevel)}</span> : null}
+          {collectError ? <span className="fp-infra-metric-state is-error">{t('metric.collectError')}</span> : null}
+          <span className={`fp-infra-metric-state ${enabled ? 'is-on' : ''}`}>{enabled ? t('metric.enabled') : t('metric.disabled')}</span>
+        </div>
+      </div>
+
+      <div className="fp-infra-metric-value">
+        <span>{t('infrastructure.currentMetricValue')}</span>
+        <strong>{currentValue} {valueUnit ? <em>{valueUnit}</em> : null}</strong>
+      </div>
+
+      <div className="fp-infra-metric-facts">
+        <MetricFact label={t('metric.collectStatus')} value={collectStatus} tone={collectError ? 'danger' : ''} />
+        {hasAlert ? <MetricFact label={t('infrastructure.activeAlert')} value={alert.message || levelText(alert.currentLevel)} tone="danger" wide /> : null}
+        <MetricFact label={t('collectionTask.lastMessage')} value={config && config.lastCollectMessage ? config.lastCollectMessage : '-'} tone={collectError ? 'danger' : ''} wide={collectError} />
+        <MetricFact label={t('metric.implementation')} value={config ? (config.implementationName || t('metric.useDefaultImplementation')) : t('infrastructure.metricNeedEnable')} />
+        <MetricFact label={t('metric.executionMode')} value={config ? labelExecution(config.executionMode) : '-'} />
+        {config && config.executionMode === 'SSH' ? <MetricFact label={t('collectionTask.executorNode')} value={executorText} tone={!executorNode ? 'danger' : ''} /> : null}
+        <MetricFact label={t('metric.interval')} value={config ? `${config.intervalSec || '-'}s` : '-'} />
+        <MetricFact label={t('collectionTask.lastCollectAt')} value={config ? formatTime(config.lastCollectAt) : '-'} />
+        <MetricFact label={t('infrastructure.currentMetricAt')} value={config ? formatTime(config.currentValueAt) : '-'} />
+        <MetricFact label={t('infrastructure.threshold')} value={thresholdText} important={thresholds.length > 0} />
+      </div>
+
+      <div className="fp-infra-metric-actions">
+        {config ? (
+          <button className="fp-button fp-button--small" type="button" onClick={() => onEdit(config)}>{t('infrastructure.configureCollect')}</button>
+        ) : (
+          <button className="fp-button fp-button--primary fp-button--small" type="button" onClick={() => onAdd(metric)}>{t('infrastructure.enableMetric')}</button>
+        )}
+        <button className="fp-button fp-button--small" type="button" onClick={() => onThreshold(row)}>{thresholds.length ? t('infrastructure.editThreshold') : t('infrastructure.configureThreshold')}</button>
+      </div>
+    </article>
+  );
+}
+
+function MetricFact({ label, value, important = false, tone = '', wide = false }) {
+  return (
+    <div className={`${important ? 'is-important' : ''} ${tone ? `is-${tone}` : ''} ${wide ? 'is-wide' : ''}`}>
+      <span>{label}</span>
+      <strong title={String(value || '-')}>{value || '-'}</strong>
+    </div>
+  );
+}
+
+function ConfigBlock({ title, children }) {
+  return (
+    <section className="fp-infra-config-block">
+      <h2>{title}</h2>
+      <div className="fp-info-grid">{children}</div>
+    </section>
+  );
+}
+
+function FormGroup({ title, desc, children }) {
+  return (
+    <section className="fp-infra-form-group">
+      <div className="fp-infra-form-group__head">
+        <h2>{title}</h2>
+        {desc ? <p>{desc}</p> : null}
+      </div>
+      <div className="fp-form fp-form--page fp-infra-form-grid">{children}</div>
+    </section>
+  );
+}
+
+function ActiveAlertList({ alerts }) {
+  const visibleAlerts = (alerts || []).slice(0, 3);
+  const extraCount = Math.max((alerts || []).length - visibleAlerts.length, 0);
+  return (
+    <div className="fp-infra-alert-list">
+      <div className="fp-infra-alert-list__head">
+        <strong>{t('infrastructure.activeAlert')}</strong>
+        <span>{alerts.length}</span>
+      </div>
+      <div className="fp-infra-alert-list__items">
+        {visibleAlerts.map((alert) => (
+          <div className={`fp-infra-alert-item is-${alert.currentLevel}`} key={alert.id}>
+            <span>{levelText(alert.currentLevel)}</span>
+            <strong title={alert.message || ''}>{alert.message || `${alert.objectName || alert.objectCode} ${levelText(alert.currentLevel)}`}</strong>
+          </div>
+        ))}
+        {extraCount > 0 ? <em>{t('infrastructure.moreActiveAlerts', extraCount)}</em> : null}
+      </div>
+    </div>
   );
 }
 
@@ -680,6 +1298,15 @@ function formatTime(value) {
   return new Date(value).toLocaleString();
 }
 
+function formatMetricValue(value, precision = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return '-';
+  }
+  const digits = Number.isInteger(Number(precision)) ? Number(precision) : 2;
+  return number.toFixed(Math.max(0, Math.min(digits, 8))).replace(/\.?0+$/, '');
+}
+
 function endpointHint(type) {
   if (type === 'KAFKA') {
     return t('infrastructure.kafkaEndpointHint');
@@ -771,4 +1398,259 @@ function normalizeFormByAuth(form) {
     return { ...form, authType, username: '', password: '' };
   }
   return form;
+}
+
+function defaultInfrastructureMetricConfig(infrastructure, metric = null) {
+  return {
+    objectType: infrastructure.type,
+    objectId: infrastructure.id,
+    objectCode: infrastructure.code,
+    objectName: infrastructure.name,
+    metricDefinitionId: metric ? metric.id : '',
+    implementationId: '',
+    executionMode: 'SSH',
+    intervalSec: 60,
+    parameterJson: '',
+    enabled: true,
+    description: '',
+    executorNodeId: '',
+  };
+}
+
+function defaultQuickThresholdForm(infrastructure, metric, rule = null) {
+  const parsedConditions = parseThresholdConditions(rule && rule.conditionsJson);
+  const conditionIndex = {};
+  parsedConditions.forEach((condition) => {
+    conditionIndex[condition.severity] = condition;
+  });
+  return {
+    id: rule ? rule.id : '',
+    ruleCode: rule ? rule.ruleCode : `thr_${infrastructure.code}_${metric.metricCode}`.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase(),
+    ruleName: rule ? rule.ruleName : `${infrastructure.name} - ${metric.metricName}`,
+    metricDefinitionId: metric.id,
+    evaluationWindowSec: rule ? rule.evaluationWindowSec : 60,
+    consecutiveCount: rule ? rule.consecutiveCount : 1,
+    recoveryPolicy: rule ? rule.recoveryPolicy || 'AUTO' : 'AUTO',
+    enabled: rule ? rule.enabled !== false : true,
+    description: rule ? rule.description || '' : '',
+    conditions: QUICK_THRESHOLD_SEVERITIES.map(([severity]) => {
+      const condition = conditionIndex[severity] || {};
+      return {
+        severity,
+        enabled: Boolean(conditionIndex[severity]),
+        operator: condition.operator || '>=',
+        value: condition.value !== undefined && condition.value !== null ? String(condition.value) : '',
+      };
+    }),
+  };
+}
+
+function normalizeQuickThreshold(form, infrastructure, metric) {
+  const conditions = form.conditions
+    .filter((condition) => condition.enabled && condition.value !== '')
+    .map((condition) => ({
+      severity: condition.severity,
+      operator: condition.operator || '>=',
+      value: Number(condition.value),
+    }))
+    .filter((condition) => Number.isFinite(condition.value));
+  return {
+    ruleCode: form.ruleCode,
+    ruleName: form.ruleName,
+    metricDefinitionId: metric.id,
+    scopeType: 'RESOURCE',
+    objectType: infrastructure.type,
+    objectId: infrastructure.id,
+    objectCode: infrastructure.code,
+    objectName: infrastructure.name,
+    topologyId: '',
+    topologyElementId: '',
+    topologyElementType: '',
+    conditionsJson: conditions.length ? JSON.stringify(conditions) : '',
+    evaluationWindowSec: Number(form.evaluationWindowSec) || 60,
+    consecutiveCount: Number(form.consecutiveCount) || 1,
+    recoveryPolicy: form.recoveryPolicy || 'AUTO',
+    enabled: form.enabled !== false,
+    description: form.description || '',
+  };
+}
+
+function severityLabel(severity) {
+  const labels = {
+    REMIND: 'threshold.severity.remind',
+    WARNING: 'threshold.severity.warning',
+    ERROR: 'threshold.severity.error',
+    CRITICAL: 'threshold.severity.critical',
+    URGENT: 'threshold.severity.urgent',
+  };
+  return labels[severity] || severity;
+}
+
+function normalizeInfrastructureMetricConfig(form, infrastructure) {
+  return {
+    objectType: infrastructure.type,
+    objectId: infrastructure.id,
+    objectCode: infrastructure.code,
+    objectName: infrastructure.name,
+    metricDefinitionId: form.metricDefinitionId,
+    implementationId: form.implementationId || '',
+    executionMode: form.executionMode || 'SSH',
+    executorNodeId: form.executorNodeId || '',
+    intervalSec: Number(form.intervalSec || 60),
+    parameterJson: form.parameterJson || '',
+    enabled: form.enabled !== false,
+    description: form.description || '',
+  };
+}
+
+function filterInfrastructureMetrics(metrics, infrastructureType) {
+  return metrics.filter((item) => {
+    if (item.enabled === false) {
+      return false;
+    }
+    if (item.objectType === infrastructureType) {
+      return true;
+    }
+    return item.metricCategory === 'INFRASTRUCTURE' && (!item.objectType || item.objectType === infrastructureType);
+  });
+}
+
+function filterExecutorNodes(nodes, infrastructure, executionMode) {
+  if (executionMode !== 'SSH' && executionMode !== 'AGENT') {
+    return [];
+  }
+  return nodes.filter((node) => {
+    if (node.envId !== infrastructure.envId || node.regionId !== infrastructure.regionId) {
+      return false;
+    }
+    return executionMode === 'SSH' ? node.sshSupported === true : node.agentSupported === true;
+  });
+}
+
+function executorNodeOptionLabel(node) {
+  const status = node.connectionStatus ? ` / ${labelStatus(node.connectionStatus)}` : '';
+  return `${node.host}${status}`;
+}
+
+function labelStatus(status) {
+  if (status === 'NORMAL') {
+    return t('infrastructure.statusNormal');
+  }
+  if (status === 'ERROR') {
+    return t('infrastructure.statusError');
+  }
+  return t('infrastructure.statusUnknown');
+}
+
+function buildMetricRows(metrics, configs, thresholds) {
+  const configByMetric = {};
+  configs.forEach((config) => {
+    configByMetric[config.metricDefinitionId] = config;
+  });
+  const thresholdsByMetric = {};
+  thresholds.forEach((rule) => {
+    if (!thresholdsByMetric[rule.metricDefinitionId]) {
+      thresholdsByMetric[rule.metricDefinitionId] = [];
+    }
+    thresholdsByMetric[rule.metricDefinitionId].push(rule);
+  });
+  return metrics.map((metric) => ({
+    metric,
+    config: configByMetric[metric.id] || null,
+    thresholds: thresholdsByMetric[metric.id] || [],
+  }));
+}
+
+function summarizeThreshold(rule) {
+  if (!rule) {
+    return '-';
+  }
+  const conditions = parseThresholdConditions(rule.conditionsJson);
+  if (!conditions.length) {
+    return rule.enabled === false ? t('infrastructure.thresholdDisabled') : t('infrastructure.thresholdConfigured');
+  }
+  const text = conditions
+    .slice(0, 3)
+    .map((item) => `${severityText(item.severity)} ${item.operator || ''} ${item.value ?? '-'}`)
+    .join(' / ');
+  return rule.enabled === false ? `${text} (${t('metric.disabled')})` : text;
+}
+
+function parseThresholdConditions(value) {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function severityText(value) {
+  const map = {
+    NORMAL: t('metric.collectNormal'),
+    REMIND: t('threshold.severity.remind'),
+    WARNING: t('threshold.severity.warning'),
+    ERROR: t('threshold.severity.error'),
+    CRITICAL: t('threshold.severity.critical'),
+    URGENT: t('threshold.severity.urgent'),
+    UNKNOWN: t('metric.collectUnknown'),
+  };
+  return map[value] || value || '-';
+}
+
+function levelText(value) {
+  return severityText(value);
+}
+
+function labelExecution(value) {
+  return value || '-';
+}
+
+function labelCollect(value) {
+  if (value === 'NORMAL' || value === 'SUCCESS') return t('metric.collectNormal');
+  if (value === 'ERROR') return t('metric.collectError');
+  return t('metric.collectUnknown');
+}
+
+function groupAlertsByMetric(alerts) {
+  const grouped = {};
+  alerts.forEach((alert) => {
+    const current = grouped[alert.metricDefinitionId];
+    if (!current || levelRank(alert.currentLevel) > levelRank(current.currentLevel)) {
+      grouped[alert.metricDefinitionId] = alert;
+    }
+  });
+  return grouped;
+}
+
+function groupAlertsByObject(alerts) {
+  const grouped = {};
+  (alerts || []).forEach((alert) => {
+    const current = grouped[alert.objectId];
+    if (!current || levelRank(alert.currentLevel) > levelRank(current.currentLevel)) {
+      grouped[alert.objectId] = alert;
+    }
+  });
+  return grouped;
+}
+
+function highestActiveAlert(alerts) {
+  return (alerts || []).reduce((highest, alert) => {
+    if (!highest || levelRank(alert.currentLevel) > levelRank(highest.currentLevel)) {
+      return alert;
+    }
+    return highest;
+  }, null);
+}
+
+function levelRank(level) {
+  const ranks = {
+    NORMAL: 0,
+    REMIND: 1,
+    WARNING: 2,
+    ERROR: 3,
+    CRITICAL: 4,
+    URGENT: 5,
+  };
+  return ranks[level] || 0;
 }

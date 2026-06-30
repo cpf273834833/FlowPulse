@@ -200,8 +200,8 @@ export default function CollectionTaskPage() {
 
       <div className="fp-stat-grid fp-stat-grid--four fp-metric-stats">
         {statCards(tasks).map((stat) => (
-          <div className="fp-stat-card" key={stat.label}>
-            <span className="fp-stat-card__icon"><stat.Icon /></span>
+          <div className="fp-stat" key={stat.label}>
+            <div className="fp-stat__icon"><stat.Icon /></div>
             <div>
               <span>{stat.label}</span>
               <strong>{stat.value}</strong>
@@ -256,7 +256,9 @@ export default function CollectionTaskPage() {
               <span>{t('metric.implementation')}</span>
               <span>{t('metric.executionMode')}</span>
               <span>{t('metric.interval')}</span>
+              <span>{t('infrastructure.currentMetricValue')}</span>
               <span>{t('metric.collectStatus')}</span>
+              <span>{t('collectionTask.nextCollectAt')}</span>
               <span>{t('operation')}</span>
             </div>
             {tasks.configs.records.map((task) => (
@@ -277,7 +279,9 @@ export default function CollectionTaskPage() {
                 <span>{task.implementationName || t('metric.useDefaultImplementation')}</span>
                 <span>{executionLabel(task.executionMode)}</span>
                 <span>{task.intervalSec || '-'}s</span>
+                <span>{formatMetricValue(task.currentValue)}</span>
                 <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
+                <span>{formatTime(task.nextCollectAt)}</span>
                 <span className="fp-row-actions" onClick={(event) => event.stopPropagation()}>
                   <button type="button" onClick={() => setRoute({ name: 'detail', id: task.id })}>{t('detail')}</button>
                   <button type="button" onClick={() => openEdit(task)}>{t('collectionTask.config')}</button>
@@ -293,17 +297,6 @@ export default function CollectionTaskPage() {
             onChange={(next) => loadTasks({ ...taskQuery, ...next })}
           />
         </div>
-
-        <aside className="fp-task-side">
-          <TaskStatusList
-            tasks={tasks.configs.records}
-            selectedTaskId={selectedTask && selectedTask.id}
-            executorIndex={executorIndex}
-            onSelect={setSelectedTaskId}
-            onDetail={(task) => setRoute({ name: 'detail', id: task.id })}
-            onConfig={openEdit}
-          />
-        </aside>
       </div>
     </section>
   );
@@ -315,7 +308,7 @@ function ScopePanel({ environments, regions, scope, onSelect }) {
   return (
     <aside className="fp-infra-tree fp-task-scope">
       <strong className="fp-infra-tree__title">{t('collectionTask.scopeTree')}</strong>
-          <button className={!scope.envId && !scope.regionId ? 'is-active' : ''} type="button" onClick={() => onSelect({})}>
+      <button className={!scope.envId && !scope.regionId ? 'is-active' : ''} type="button" onClick={() => onSelect({})}>
         <span>{t('collectionTask.allScope')}</span>
         <em>{t('collectionTask.allTask')}</em>
       </button>
@@ -348,52 +341,6 @@ function ScopePanel({ environments, regions, scope, onSelect }) {
         </div>
       ))}
     </aside>
-  );
-}
-
-function TaskStatusList({ tasks, selectedTaskId, executorIndex, onSelect, onDetail, onConfig }) {
-  return (
-    <section className="fp-metric-side fp-task-status-list">
-      <div className="fp-metric-side__head">
-        <div>
-          <h2>{t('collectionTask.taskStatusList')}</h2>
-          <p>{t('collectionTask.taskStatusListDesc')}</p>
-        </div>
-        <span className="fp-mini-tag">{tasks.length}</span>
-      </div>
-      <div className="fp-task-status-items">
-        {tasks.map((task) => {
-          const executor = executorIndex[task.executorNodeId];
-          return (
-            <button
-              className={`fp-task-status-card ${selectedTaskId === task.id ? 'is-selected' : ''}`}
-              type="button"
-              key={task.id}
-              onClick={() => onSelect(task.id)}
-            >
-              <span className="fp-task-status-card__head">
-                <strong>{task.objectName}</strong>
-                <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
-              </span>
-              <em>{task.metricName || task.metricCode || '-'}</em>
-              <span className="fp-task-status-card__meta">
-                <span>{executionLabel(task.executionMode)}</span>
-                <span>{executor ? executor.host : task.executorNodeId || '-'}</span>
-              </span>
-              <span className="fp-task-status-card__meta">
-                <span>{t('metric.interval')} {task.intervalSec || '-'}s</span>
-                <span>{t('collectionTask.nextCollectAt')} {formatTime(task.nextCollectAt)}</span>
-              </span>
-              <span className="fp-task-status-card__actions" onClick={(event) => event.stopPropagation()}>
-                <button type="button" onClick={() => onDetail(task)}>{t('detail')}</button>
-                <button type="button" onClick={() => onConfig(task)}>{t('collectionTask.config')}</button>
-              </span>
-            </button>
-          );
-        })}
-        {tasks.length === 0 ? <div className="fp-side-empty">{t('empty')}</div> : null}
-      </div>
-    </section>
   );
 }
 
@@ -538,6 +485,8 @@ function TaskDetailPage({ task, metric, implementation, executor, onBack, onEdit
           <Info label={t('metric.status')} value={task.enabled ? t('collectionTask.enabled') : t('collectionTask.disabled')} />
         </DetailSection>
         <DetailSection title={t('collectionTask.runtimeState')}>
+          <Info label={t('infrastructure.currentMetricValue')} value={formatMetricValue(task.currentValue)} />
+          <Info label={t('infrastructure.currentMetricAt')} value={formatTime(task.currentValueAt)} />
           <Info label={t('metric.collectStatus')} value={collectStatusText(task.lastCollectStatus, task.enabled)} />
           <Info label={t('collectionTask.lastCollectAt')} value={formatTime(task.lastCollectAt)} />
           <Info label={t('collectionTask.nextCollectAt')} value={formatTime(task.nextCollectAt)} />
@@ -664,6 +613,17 @@ function formatTime(value) {
     return '-';
   }
   return new Date(Number(value)).toLocaleString('zh-CN', { hour12: false });
+}
+
+function formatMetricValue(value) {
+  if (value === undefined || value === null || value === '') {
+    return '-';
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return '-';
+  }
+  return number.toFixed(4).replace(/\.?0+$/, '');
 }
 
 function executionLabel(value) {

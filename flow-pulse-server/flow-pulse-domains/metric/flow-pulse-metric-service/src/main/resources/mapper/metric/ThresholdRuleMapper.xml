@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.metric.infrastructure.persistence.mapper.ThresholdRuleMapper">
+    <resultMap id="ThresholdRuleMap" type="com.flowpulse.metric.domain.model.ThresholdRuleEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="rule_code" property="ruleCode"/>
+        <result column="rule_name" property="ruleName"/>
+        <result column="metric_definition_id" property="metricDefinitionId"/>
+        <result column="metric_code" property="metricCode"/>
+        <result column="metric_name" property="metricName"/>
+        <result column="scope_type" property="scopeType"/>
+        <result column="object_type" property="objectType"/>
+        <result column="object_id" property="objectId"/>
+        <result column="object_code" property="objectCode"/>
+        <result column="object_name" property="objectName"/>
+        <result column="topology_id" property="topologyId"/>
+        <result column="topology_element_id" property="topologyElementId"/>
+        <result column="topology_element_type" property="topologyElementType"/>
+        <result column="conditions_json" property="conditionsJson"/>
+        <result column="evaluation_window_sec" property="evaluationWindowSec"/>
+        <result column="consecutive_count" property="consecutiveCount"/>
+        <result column="recovery_policy" property="recoveryPolicy"/>
+        <result column="enabled" property="enabled"/>
+        <result column="description" property="description"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="selectColumns">
+        r.*, d.metric_code, d.metric_name
+    </sql>
+
+    <sql id="fromJoin">
+        fp_threshold_rule r
+        left join fp_metric_definition d on d.tenant_id = r.tenant_id and d.id = r.metric_definition_id
+    </sql>
+
+    <sql id="pageWhere">
+        r.tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            and (lower(r.rule_code) like concat('%', lower(#{keyword}), '%')
+            or lower(r.rule_name) like concat('%', lower(#{keyword}), '%')
+            or lower(r.object_code) like concat('%', lower(#{keyword}), '%')
+            or lower(r.object_name) like concat('%', lower(#{keyword}), '%'))
+        </if>
+        <if test="metricDefinitionId != null and metricDefinitionId != ''">
+            and r.metric_definition_id = #{metricDefinitionId}
+        </if>
+        <if test="scopeType != null and scopeType != ''">
+            and r.scope_type = #{scopeType}
+        </if>
+        <if test="objectType != null and objectType != ''">
+            and r.object_type = #{objectType}
+        </if>
+        <if test="objectId != null and objectId != ''">
+            and r.object_id = #{objectId}
+        </if>
+        <if test="enabled != null">
+            and r.enabled = #{enabled}
+        </if>
+    </sql>
+
+    <select id="selectById" resultMap="ThresholdRuleMap">
+        select <include refid="selectColumns"/>
+        from <include refid="fromJoin"/>
+        where r.tenant_id = #{tenantId} and r.id = #{id}
+    </select>
+
+    <select id="selectByCode" resultMap="ThresholdRuleMap">
+        select <include refid="selectColumns"/>
+        from <include refid="fromJoin"/>
+        where r.tenant_id = #{tenantId} and r.rule_code = #{ruleCode}
+    </select>
+
+    <select id="selectPage" resultMap="ThresholdRuleMap">
+        select <include refid="selectColumns"/>
+        from <include refid="fromJoin"/>
+        where <include refid="pageWhere"/>
+        order by r.updated_at desc, r.created_at desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(1)
+        from fp_threshold_rule r
+        where <include refid="pageWhere"/>
+    </select>
+
+    <select id="countAll" resultType="long">
+        select count(1) from fp_threshold_rule where tenant_id = #{tenantId}
+    </select>
+
+    <select id="countEnabled" resultType="long">
+        select count(1) from fp_threshold_rule where tenant_id = #{tenantId} and enabled = true
+    </select>
+
+    <select id="countScope" resultType="long">
+        select count(1) from fp_threshold_rule where tenant_id = #{tenantId} and scope_type = #{scopeType}
+    </select>
+
+    <select id="selectEnabledResourceRules" resultMap="ThresholdRuleMap">
+        select r.*, m.metric_code, m.metric_name
+        from fp_threshold_rule r
+        left join fp_metric_definition m on m.tenant_id = r.tenant_id and m.id = r.metric_definition_id
+        where r.tenant_id = #{tenantId}
+          and r.metric_definition_id = #{metricDefinitionId}
+          and r.scope_type = 'RESOURCE'
+          and r.object_type = #{objectType}
+          and r.object_id = #{objectId}
+          and r.enabled = true
+        order by r.updated_at desc
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.metric.domain.model.ThresholdRuleEntity">
+        insert into fp_threshold_rule (
+            id, tenant_id, rule_code, rule_name, metric_definition_id, scope_type,
+            object_type, object_id, object_code, object_name, topology_id, topology_element_id,
+            topology_element_type, conditions_json, evaluation_window_sec, consecutive_count,
+            recovery_policy, enabled, description, created_at, updated_at
+        ) values (
+            #{id}, #{tenantId}, #{ruleCode}, #{ruleName}, #{metricDefinitionId}, #{scopeType},
+            #{objectType}, #{objectId}, #{objectCode}, #{objectName}, #{topologyId}, #{topologyElementId},
+            #{topologyElementType}, #{conditionsJson}, #{evaluationWindowSec}, #{consecutiveCount},
+            #{recoveryPolicy}, #{enabled}, #{description}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.metric.domain.model.ThresholdRuleEntity">
+        update fp_threshold_rule
+        set rule_code = #{ruleCode},
+            rule_name = #{ruleName},
+            metric_definition_id = #{metricDefinitionId},
+            scope_type = #{scopeType},
+            object_type = #{objectType},
+            object_id = #{objectId},
+            object_code = #{objectCode},
+            object_name = #{objectName},
+            topology_id = #{topologyId},
+            topology_element_id = #{topologyElementId},
+            topology_element_type = #{topologyElementType},
+            conditions_json = #{conditionsJson},
+            evaluation_window_sec = #{evaluationWindowSec},
+            consecutive_count = #{consecutiveCount},
+            recovery_policy = #{recoveryPolicy},
+            enabled = #{enabled},
+            description = #{description},
+            updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from fp_threshold_rule where tenant_id = #{tenantId} and id = #{id}
+    </delete>
+</mapper>

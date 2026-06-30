@@ -1,0 +1,115 @@
+.fp-threshold-page {
+  min-width: 0;
+}
+
+.fp-threshold-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 14px;
+  align-items: start;
+}
+
+.fp-threshold-panel {
+  min-width: 0;
+  padding: 14px;
+}
+
+.fp-threshold-table .fp-data-table__row {
+  grid-template-columns: minmax(160px, 1.2fr) minmax(140px, .95fr) minmax(100px, .65fr) minmax(150px, 1fr) minmax(90px, .55fr) minmax(120px, .7fr);
+  min-height: 42px;
+  font-size: 13px;
+}
+
+.fp-threshold-table .fp-data-table__row > span,
+.fp-threshold-table .fp-data-table__row > strong,
+.fp-threshold-table .fp-data-table__row > div {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-threshold-side {
+  position: sticky;
+  top: 12px;
+  overflow: hidden;
+}
+
+.fp-threshold-side__head {
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(100, 148, 196, 0.16);
+}
+
+.fp-threshold-side__head h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.fp-threshold-side__head p {
+  margin: 0;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+
+.fp-threshold-kv {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.fp-threshold-kv div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+
+.fp-threshold-kv strong {
+  color: var(--fp-text);
+  text-align: right;
+}
+
+.fp-condition-preview {
+  max-height: 180px;
+  overflow: auto;
+  margin: 14px 0 0;
+  padding: 12px;
+  border: 1px solid rgba(91, 148, 214, 0.22);
+  border-radius: 12px;
+  color: #dcecff;
+  background: rgba(3, 12, 28, 0.72);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.fp-threshold-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fp-threshold-form .fp-field--wide,
+.fp-threshold-form .fp-form-section {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1280px) {
+  .fp-threshold-board {
+    grid-template-columns: 1fr;
+  }
+
+  .fp-threshold-side {
+    position: static;
+  }
+}
+
+@media (max-width: 920px) {
+  .fp-threshold-form,
+  .fp-threshold-table .fp-data-table__row {
+    grid-template-columns: 1fr;
+  }
+}

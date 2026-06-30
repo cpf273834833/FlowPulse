@@ -19,22 +19,9 @@
     <description>FlowPulse data-flow observability platform</description>
 
     <modules>
-        <module>flow-pulse-common</module>
-        <module>flow-pulse-security</module>
-        <module>flow-pulse-tenant</module>
-        <module>flow-pulse-management-api</module>
-        <module>flow-pulse-management-service</module>
-        <module>flow-pulse-resource-api</module>
-        <module>flow-pulse-resource-service</module>
-        <module>flow-pulse-infrastructure-api</module>
-        <module>flow-pulse-infrastructure-service</module>
-        <module>flow-pulse-executor-api</module>
-        <module>flow-pulse-executor-service</module>
-        <module>flow-pulse-metric-api</module>
-        <module>flow-pulse-metric-service</module>
-        <module>flow-pulse-integration-api</module>
-        <module>flow-pulse-integration-service</module>
-        <module>flow-pulse-web</module>
+        <module>flow-pulse-platform</module>
+        <module>flow-pulse-domains</module>
+        <module>flow-pulse-apps</module>
     </modules>
 
     <properties>
@@ -113,6 +100,26 @@
             <dependency>
                 <groupId>uyun.flowpulse</groupId>
                 <artifactId>flow-pulse-metric-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>uyun.flowpulse</groupId>
+                <artifactId>flow-pulse-alert-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>uyun.flowpulse</groupId>
+                <artifactId>flow-pulse-alert-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>uyun.flowpulse</groupId>
+                <artifactId>flow-pulse-topology-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>uyun.flowpulse</groupId>
+                <artifactId>flow-pulse-topology-service</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

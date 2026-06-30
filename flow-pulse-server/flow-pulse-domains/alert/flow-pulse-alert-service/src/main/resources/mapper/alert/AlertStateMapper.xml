@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.alert.infrastructure.persistence.mapper.AlertStateMapper">
+    <resultMap id="AlertStateMap" type="com.flowpulse.alert.domain.model.AlertStateEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="alert_key" property="alertKey"/>
+        <result column="rule_id" property="ruleId"/>
+        <result column="metric_definition_id" property="metricDefinitionId"/>
+        <result column="object_type" property="objectType"/>
+        <result column="object_id" property="objectId"/>
+        <result column="object_code" property="objectCode"/>
+        <result column="object_name" property="objectName"/>
+        <result column="topology_id" property="topologyId"/>
+        <result column="topology_element_id" property="topologyElementId"/>
+        <result column="topology_element_type" property="topologyElementType"/>
+        <result column="current_level" property="currentLevel"/>
+        <result column="previous_level" property="previousLevel"/>
+        <result column="status" property="status"/>
+        <result column="first_triggered_at" property="firstTriggeredAt"/>
+        <result column="last_changed_at" property="lastChangedAt"/>
+        <result column="last_evaluated_at" property="lastEvaluatedAt"/>
+        <result column="recovered_at" property="recoveredAt"/>
+        <result column="trigger_value" property="triggerValue"/>
+        <result column="message" property="message"/>
+        <result column="reason_json" property="reasonJson"/>
+        <result column="acknowledged" property="acknowledged"/>
+        <result column="acknowledged_by" property="acknowledgedBy"/>
+        <result column="acknowledged_at" property="acknowledgedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="wherePage">
+        tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            and (lower(alert_key) like concat('%', lower(#{keyword}), '%')
+            or lower(object_code) like concat('%', lower(#{keyword}), '%')
+            or lower(object_name) like concat('%', lower(#{keyword}), '%')
+            or lower(message) like concat('%', lower(#{keyword}), '%'))
+        </if>
+        <if test="level != null and level != ''">and current_level = #{level}</if>
+        <if test="status != null and status != ''">and status = #{status}</if>
+        <if test="objectType != null and objectType != ''">and object_type = #{objectType}</if>
+        <if test="topologyId != null and topologyId != ''">and topology_id = #{topologyId}</if>
+        <if test="topologyElementId != null and topologyElementId != ''">and topology_element_id = #{topologyElementId}</if>
+    </sql>
+
+    <select id="selectById" resultMap="AlertStateMap">
+        select * from fp_alert_state where tenant_id = #{tenantId} and id = #{id}
+    </select>
+
+    <select id="selectByAlertKey" resultMap="AlertStateMap">
+        select * from fp_alert_state where tenant_id = #{tenantId} and alert_key = #{alertKey}
+    </select>
+
+    <select id="selectPage" resultMap="AlertStateMap">
+        select * from fp_alert_state where <include refid="wherePage"/>
+        order by last_changed_at desc, updated_at desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(1) from fp_alert_state where <include refid="wherePage"/>
+    </select>
+
+    <select id="countAll" resultType="long">
+        select count(1) from fp_alert_state where tenant_id = #{tenantId}
+    </select>
+
+    <select id="countByStatus" resultType="long">
+        select count(1) from fp_alert_state where tenant_id = #{tenantId} and status = #{status}
+    </select>
+
+    <select id="countByLevel" resultType="long">
+        select count(1) from fp_alert_state where tenant_id = #{tenantId} and current_level = #{level}
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.alert.domain.model.AlertStateEntity">
+        insert into fp_alert_state (
+            id, tenant_id, alert_key, rule_id, metric_definition_id, object_type, object_id, object_code, object_name,
+            topology_id, topology_element_id, topology_element_type, current_level, previous_level, status,
+            first_triggered_at, last_changed_at, last_evaluated_at, recovered_at, trigger_value, message, reason_json,
+            acknowledged, acknowledged_by, acknowledged_at, created_at, updated_at
+        ) values (
+            #{id}, #{tenantId}, #{alertKey}, #{ruleId}, #{metricDefinitionId}, #{objectType}, #{objectId}, #{objectCode}, #{objectName},
+            #{topologyId}, #{topologyElementId}, #{topologyElementType}, #{currentLevel}, #{previousLevel}, #{status},
+            #{firstTriggeredAt}, #{lastChangedAt}, #{lastEvaluatedAt}, #{recoveredAt}, #{triggerValue}, #{message}, #{reasonJson},
+            #{acknowledged}, #{acknowledgedBy}, #{acknowledgedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.alert.domain.model.AlertStateEntity">
+        update fp_alert_state
+        set rule_id = #{ruleId},
+            metric_definition_id = #{metricDefinitionId},
+            object_type = #{objectType},
+            object_id = #{objectId},
+            object_code = #{objectCode},
+            object_name = #{objectName},
+            topology_id = #{topologyId},
+            topology_element_id = #{topologyElementId},
+            topology_element_type = #{topologyElementType},
+            current_level = #{currentLevel},
+            previous_level = #{previousLevel},
+            status = #{status},
+            first_triggered_at = #{firstTriggeredAt},
+            last_changed_at = #{lastChangedAt},
+            last_evaluated_at = #{lastEvaluatedAt},
+            recovered_at = #{recoveredAt},
+            trigger_value = #{triggerValue},
+            message = #{message},
+            reason_json = #{reasonJson},
+            acknowledged = #{acknowledged},
+            acknowledged_by = #{acknowledgedBy},
+            acknowledged_at = #{acknowledgedAt},
+            updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <update id="acknowledge">
+        update fp_alert_state
+        set acknowledged = true, acknowledged_by = #{operator}, acknowledged_at = #{now}, updated_at = #{now}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+</mapper>

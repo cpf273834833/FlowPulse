@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.topology.infrastructure.persistence.mapper.TopologyMapper">
+    <resultMap id="TopologyMap" type="com.flowpulse.topology.domain.model.TopologyEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="topology_code" property="topologyCode"/>
+        <result column="topology_name" property="topologyName"/>
+        <result column="env_id" property="envId"/>
+        <result column="description" property="description"/>
+        <result column="canvas_config_json" property="canvasConfigJson"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <sql id="wherePage">
+        tenant_id = #{tenantId}
+        <if test="keyword != null and keyword != ''">
+            and (lower(topology_code) like concat('%', lower(#{keyword}), '%')
+            or lower(topology_name) like concat('%', lower(#{keyword}), '%'))
+        </if>
+        <if test="envId != null and envId != ''">and env_id = #{envId}</if>
+    </sql>
+    <select id="selectById" resultMap="TopologyMap">select * from fp_topology where tenant_id = #{tenantId} and id = #{id}</select>
+    <select id="selectByCode" resultMap="TopologyMap">select * from fp_topology where tenant_id = #{tenantId} and topology_code = #{topologyCode}</select>
+    <select id="selectPage" resultMap="TopologyMap">
+        select * from fp_topology where <include refid="wherePage"/> order by updated_at desc limit #{limit} offset #{offset}
+    </select>
+    <select id="countPage" resultType="long">select count(1) from fp_topology where <include refid="wherePage"/></select>
+    <select id="countAll" resultType="long">select count(1) from fp_topology where tenant_id = #{tenantId}</select>
+    <insert id="insert" parameterType="com.flowpulse.topology.domain.model.TopologyEntity">
+        insert into fp_topology (id, tenant_id, topology_code, topology_name, env_id, description, canvas_config_json, created_at, updated_at)
+        values (#{id}, #{tenantId}, #{topologyCode}, #{topologyName}, #{envId}, #{description}, #{canvasConfigJson}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="update" parameterType="com.flowpulse.topology.domain.model.TopologyEntity">
+        update fp_topology set topology_code=#{topologyCode}, topology_name=#{topologyName}, env_id=#{envId},
+        description=#{description}, canvas_config_json=#{canvasConfigJson}, updated_at=#{updatedAt}
+        where tenant_id=#{tenantId} and id=#{id}
+    </update>
+    <delete id="deleteById">delete from fp_topology where tenant_id = #{tenantId} and id = #{id}</delete>
+</mapper>

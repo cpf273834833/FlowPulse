@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.alert.infrastructure.persistence.mapper.NotificationChannelMapper">
+    <resultMap id="NotificationChannelMap" type="com.flowpulse.alert.domain.model.NotificationChannelEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="channel_code" property="channelCode"/>
+        <result column="channel_name" property="channelName"/>
+        <result column="channel_type" property="channelType"/>
+        <result column="endpoint" property="endpoint"/>
+        <result column="api_key" property="apiKey"/>
+        <result column="enabled" property="enabled"/>
+        <result column="description" property="description"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="NotificationChannelMap">
+        select * from fp_notification_channel where tenant_id = #{tenantId} order by updated_at desc
+    </select>
+
+    <select id="selectById" resultMap="NotificationChannelMap">
+        select * from fp_notification_channel where tenant_id = #{tenantId} and id = #{id}
+    </select>
+
+    <select id="selectByCode" resultMap="NotificationChannelMap">
+        select * from fp_notification_channel where tenant_id = #{tenantId} and channel_code = #{channelCode}
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.alert.domain.model.NotificationChannelEntity">
+        insert into fp_notification_channel (
+            id, tenant_id, channel_code, channel_name, channel_type, endpoint, api_key,
+            enabled, description, created_at, updated_at
+        ) values (
+            #{id}, #{tenantId}, #{channelCode}, #{channelName}, #{channelType}, #{endpoint}, #{apiKey},
+            #{enabled}, #{description}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.alert.domain.model.NotificationChannelEntity">
+        update fp_notification_channel
+        set channel_code = #{channelCode},
+            channel_name = #{channelName},
+            channel_type = #{channelType},
+            endpoint = #{endpoint},
+            api_key = #{apiKey},
+            enabled = #{enabled},
+            description = #{description},
+            updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from fp_notification_channel where tenant_id = #{tenantId} and id = #{id}
+    </delete>
+</mapper>

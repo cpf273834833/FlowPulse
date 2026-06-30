@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.topology.infrastructure.persistence.mapper.TopologyEdgeMapper">
+    <resultMap id="TopologyEdgeMap" type="com.flowpulse.topology.domain.model.TopologyEdgeEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="topology_id" property="topologyId"/>
+        <result column="edge_key" property="edgeKey"/>
+        <result column="edge_name" property="edgeName"/>
+        <result column="edge_type" property="edgeType"/>
+        <result column="source_node_id" property="sourceNodeId"/>
+        <result column="target_node_id" property="targetNodeId"/>
+        <result column="relation_type" property="relationType"/>
+        <result column="relation_id" property="relationId"/>
+        <result column="path_json" property="pathJson"/>
+        <result column="label_position_json" property="labelPositionJson"/>
+        <result column="style_json" property="styleJson"/>
+        <result column="metric_display_json" property="metricDisplayJson"/>
+        <result column="hidden" property="hidden"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <select id="selectByTopologyId" resultMap="TopologyEdgeMap">select * from fp_topology_edge where tenant_id=#{tenantId} and topology_id=#{topologyId} order by created_at</select>
+    <select id="countAll" resultType="long">select count(1) from fp_topology_edge where tenant_id=#{tenantId}</select>
+    <insert id="insert" parameterType="com.flowpulse.topology.domain.model.TopologyEdgeEntity">
+        insert into fp_topology_edge (id, tenant_id, topology_id, edge_key, edge_name, edge_type, source_node_id, target_node_id, relation_type, relation_id, path_json, label_position_json, style_json, metric_display_json, hidden, created_at, updated_at)
+        values (#{id}, #{tenantId}, #{topologyId}, #{edgeKey}, #{edgeName}, #{edgeType}, #{sourceNodeId}, #{targetNodeId}, #{relationType}, #{relationId}, #{pathJson}, #{labelPositionJson}, #{styleJson}, #{metricDisplayJson}, #{hidden}, #{createdAt}, #{updatedAt})
+    </insert>
+    <delete id="deleteByTopologyId">delete from fp_topology_edge where tenant_id=#{tenantId} and topology_id=#{topologyId}</delete>
+</mapper>

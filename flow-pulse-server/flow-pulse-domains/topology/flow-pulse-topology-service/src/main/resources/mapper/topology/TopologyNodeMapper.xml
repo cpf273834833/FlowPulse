@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.topology.infrastructure.persistence.mapper.TopologyNodeMapper">
+    <resultMap id="TopologyNodeMap" type="com.flowpulse.topology.domain.model.TopologyNodeEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="topology_id" property="topologyId"/>
+        <result column="node_key" property="nodeKey"/>
+        <result column="node_name" property="nodeName"/>
+        <result column="node_type" property="nodeType"/>
+        <result column="object_type" property="objectType"/>
+        <result column="object_id" property="objectId"/>
+        <result column="object_code" property="objectCode"/>
+        <result column="object_name" property="objectName"/>
+        <result column="x" property="x"/>
+        <result column="y" property="y"/>
+        <result column="width" property="width"/>
+        <result column="height" property="height"/>
+        <result column="style_json" property="styleJson"/>
+        <result column="metric_display_json" property="metricDisplayJson"/>
+        <result column="hidden" property="hidden"/>
+        <result column="group_key" property="groupKey"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <select id="selectByTopologyId" resultMap="TopologyNodeMap">select * from fp_topology_node where tenant_id=#{tenantId} and topology_id=#{topologyId} order by created_at</select>
+    <select id="countAll" resultType="long">select count(1) from fp_topology_node where tenant_id=#{tenantId}</select>
+    <insert id="insert" parameterType="com.flowpulse.topology.domain.model.TopologyNodeEntity">
+        insert into fp_topology_node (id, tenant_id, topology_id, node_key, node_name, node_type, object_type, object_id, object_code, object_name, x, y, width, height, style_json, metric_display_json, hidden, group_key, created_at, updated_at)
+        values (#{id}, #{tenantId}, #{topologyId}, #{nodeKey}, #{nodeName}, #{nodeType}, #{objectType}, #{objectId}, #{objectCode}, #{objectName}, #{x}, #{y}, #{width}, #{height}, #{styleJson}, #{metricDisplayJson}, #{hidden}, #{groupKey}, #{createdAt}, #{updatedAt})
+    </insert>
+    <delete id="deleteByTopologyId">delete from fp_topology_node where tenant_id=#{tenantId} and topology_id=#{topologyId}</delete>
+</mapper>

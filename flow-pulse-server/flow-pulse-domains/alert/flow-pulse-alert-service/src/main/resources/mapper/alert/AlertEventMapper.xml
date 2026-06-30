@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.alert.infrastructure.persistence.mapper.AlertEventMapper">
+    <resultMap id="AlertEventMap" type="com.flowpulse.alert.domain.model.AlertEventEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="alert_state_id" property="alertStateId"/>
+        <result column="alert_key" property="alertKey"/>
+        <result column="from_level" property="fromLevel"/>
+        <result column="to_level" property="toLevel"/>
+        <result column="event_type" property="eventType"/>
+        <result column="event_at" property="eventAt"/>
+        <result column="trigger_value" property="triggerValue"/>
+        <result column="message" property="message"/>
+        <result column="reason_json" property="reasonJson"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="selectByAlertStateId" resultMap="AlertEventMap">
+        select * from fp_alert_event
+        where tenant_id = #{tenantId} and alert_state_id = #{alertStateId}
+        order by event_at desc
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.alert.domain.model.AlertEventEntity">
+        insert into fp_alert_event (
+            id, tenant_id, alert_state_id, alert_key, from_level, to_level, event_type,
+            event_at, trigger_value, message, reason_json, created_at
+        ) values (
+            #{id}, #{tenantId}, #{alertStateId}, #{alertKey}, #{fromLevel}, #{toLevel}, #{eventType},
+            #{eventAt}, #{triggerValue}, #{message}, #{reasonJson}, #{createdAt}
+        )
+    </insert>
+</mapper>

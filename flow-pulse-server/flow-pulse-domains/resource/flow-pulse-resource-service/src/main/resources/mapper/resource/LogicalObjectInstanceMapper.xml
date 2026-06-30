@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.resource.infrastructure.persistence.mapper.LogicalObjectInstanceMapper">
+    <resultMap id="LogicalObjectInstanceMap" type="com.flowpulse.resource.domain.model.LogicalObjectInstanceEntity">
+        <id column="id" property="id"/>
+        <result column="tenant_id" property="tenantId"/>
+        <result column="logical_object_id" property="logicalObjectId"/>
+        <result column="physical_object_type" property="physicalObjectType"/>
+        <result column="physical_object_id" property="physicalObjectId"/>
+        <result column="physical_object_code" property="physicalObjectCode"/>
+        <result column="physical_object_name" property="physicalObjectName"/>
+        <result column="status" property="status"/>
+        <result column="metric_json" property="metricJson"/>
+        <result column="first_seen_at" property="firstSeenAt"/>
+        <result column="last_seen_at" property="lastSeenAt"/>
+        <result column="metadata_json" property="metadataJson"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="PageWhere">
+        where tenant_id = #{tenantId} and logical_object_id = #{logicalObjectId}
+        <if test="keyword != null and keyword != ''">
+            and (lower(physical_object_code) like concat('%', lower(#{keyword}), '%')
+              or lower(physical_object_name) like concat('%', lower(#{keyword}), '%'))
+        </if>
+        <if test="status != null and status != ''">and status = #{status}</if>
+    </sql>
+
+    <select id="selectPage" resultMap="LogicalObjectInstanceMap">
+        select * from fp_logical_object_instance
+        <include refid="PageWhere"/>
+        order by last_seen_at desc
+        limit #{pageSize} offset #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        select count(1) from fp_logical_object_instance
+        <include refid="PageWhere"/>
+    </select>
+
+    <select id="selectByPhysicalKey" resultMap="LogicalObjectInstanceMap">
+        select * from fp_logical_object_instance
+        where tenant_id = #{tenantId}
+          and logical_object_id = #{logicalObjectId}
+          and physical_object_type = #{physicalObjectType}
+          and physical_object_code = #{physicalObjectCode}
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.resource.domain.model.LogicalObjectInstanceEntity">
+        insert into fp_logical_object_instance
+        (id, tenant_id, logical_object_id, physical_object_type, physical_object_id, physical_object_code,
+         physical_object_name, status, metric_json, first_seen_at, last_seen_at, metadata_json, created_at, updated_at)
+        values
+        (#{id}, #{tenantId}, #{logicalObjectId}, #{physicalObjectType}, #{physicalObjectId}, #{physicalObjectCode},
+         #{physicalObjectName}, #{status}, #{metricJson}, #{firstSeenAt}, #{lastSeenAt}, #{metadataJson}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="update" parameterType="com.flowpulse.resource.domain.model.LogicalObjectInstanceEntity">
+        update fp_logical_object_instance
+        set physical_object_id = #{physicalObjectId},
+            physical_object_name = #{physicalObjectName},
+            status = #{status},
+            metric_json = #{metricJson},
+            last_seen_at = #{lastSeenAt},
+            metadata_json = #{metadataJson},
+            updated_at = #{updatedAt}
+        where tenant_id = #{tenantId} and id = #{id}
+    </update>
+
+    <delete id="deleteByLogicalObjectId">
+        delete from fp_logical_object_instance where tenant_id = #{tenantId} and logical_object_id = #{logicalObjectId}
+    </delete>
+</mapper>

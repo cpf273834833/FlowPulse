@@ -27,6 +27,7 @@ export default function MetricCenterPage() {
   const [selectedDefinitionId, setSelectedDefinitionId] = useState('');
   const [selectedImplementationId, setSelectedImplementationId] = useState('');
   const [selectedImplementations, setSelectedImplementations] = useState([]);
+  const [metricContext, setMetricContext] = useState(null);
   const [message, setMessage] = useState('');
   const [route, setRoute] = useState({ type: 'list' });
 
@@ -36,7 +37,20 @@ export default function MetricCenterPage() {
   const selectedImplementation = useMemo(() => implementations.find((item) => item.id === selectedImplementationId) || implementations[0], [implementations, selectedImplementationId]);
 
   useEffect(() => {
-    loadDefinitions(definitionQuery);
+    const preset = readTopologyMetricPrefill();
+    const nextDefinitionQuery = preset ? {
+      ...definitionQuery,
+      pageNo: 1,
+      metricCategory: preset.topologyElementType === 'EDGE' ? 'TOPOLOGY_EDGE' : 'TOPOLOGY_NODE',
+      objectType: preset.topologyElementType === 'EDGE' ? 'TOPOLOGY_EDGE' : 'TOPOLOGY_NODE',
+    } : definitionQuery;
+    if (preset) {
+      setMetricContext(preset);
+      setDefinitionQuery(nextDefinitionQuery);
+      setActiveTab('definition');
+      setMessage(`已进入 ${preset.objectName || preset.objectCode || '拓扑元素'} 的指标配置上下文`);
+    }
+    loadDefinitions(nextDefinitionQuery);
     loadImplementations(implementationQuery);
   }, []);
 
@@ -156,6 +170,15 @@ export default function MetricCenterPage() {
         </div>
       </div>
       <Toast message={message} onClose={() => setMessage('')} />
+      {metricContext ? (
+        <div className="fp-metric-context-banner">
+          <div>
+            <strong>拓扑指标配置</strong>
+            <span>{metricContext.topologyName || '当前拓扑'} / {metricContext.topologyElementType === 'EDGE' ? '连线' : '节点'} / {metricContext.objectName || metricContext.objectCode}</span>
+          </div>
+          <button className="fp-link-button" type="button" onClick={() => setMetricContext(null)}>清除上下文</button>
+        </div>
+      ) : null}
       <div className="fp-stat-grid fp-stat-grid--four fp-metric-stats">
         {stats.map((stat) => <div className="fp-stat" key={stat.title}><div className="fp-stat__icon"><ApiOutlined /></div><div><span>{stat.title}</span><strong>{stat.value}</strong><em>{stat.description}</em></div></div>)}
       </div>
@@ -388,5 +411,15 @@ function SelectBare({ value, options, onChange }) { return <select className="fp
 function StatusPill({ enabled }) { return <span className={`fp-status-pill ${enabled ? 'fp-status-pill--normal' : ''}`}>{enabled ? t('metric.enabled') : t('metric.disabled')}</span>; }
 function hasMapping(metric) { return Boolean(metric && metric.mappingJson && metric.mappingJson.trim && metric.mappingJson.trim().length > 0); }
 function labelOf(options, value) { const item = options.find(([optionValue]) => optionValue === value); return item ? formatLabel(item[1]) : value || '-'; }
+function readTopologyMetricPrefill() {
+  const raw = window.sessionStorage.getItem('flowpulse.metric.prefill');
+  if (!raw) return null;
+  window.sessionStorage.removeItem('flowpulse.metric.prefill');
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+}
 function formatLabel(label) { return label && label.indexOf('.') > 0 ? t(label) : label; }
 function defaultExecutionMode(type) { if (type === 'SHELL' || type === 'PYTHON') return 'SSH'; if (type === 'EXPRESSION') return 'EXPRESSION'; return 'SERVER'; }
