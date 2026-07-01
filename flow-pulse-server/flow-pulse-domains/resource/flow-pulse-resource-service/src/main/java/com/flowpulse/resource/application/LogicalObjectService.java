@@ -32,8 +32,8 @@ import java.util.regex.PatternSyntaxException;
 public class LogicalObjectService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final Set<String> OBJECT_TYPES = new HashSet<String>(Arrays.asList(
-            "SPARK_LOGICAL_JOB", "KAFKA_LOGICAL_CONSUMER_GROUP", "APPLICATION_LOGICAL_SERVICE", "CUSTOM_LOGICAL_OBJECT"));
-    private static final Set<String> SOURCE_TYPES = new HashSet<String>(Arrays.asList("SPARK", "KAFKA", "APPLICATION", "MANUAL"));
+            "SPARK_LOGICAL_JOB", "KAFKA_LOGICAL_CONSUMER_GROUP", "ES_LOGICAL_INDEX", "APPLICATION_LOGICAL_SERVICE", "CUSTOM_LOGICAL_OBJECT"));
+    private static final Set<String> SOURCE_TYPES = new HashSet<String>(Arrays.asList("SPARK", "KAFKA", "ELASTICSEARCH", "APPLICATION", "MANUAL"));
     private static final Set<String> MATCH_TYPES = new HashSet<String>(Arrays.asList("EXACT", "PREFIX", "REGEX", "EXPRESSION"));
 
     private final LogicalObjectMapper logicalObjectMapper;
@@ -211,6 +211,9 @@ public class LogicalObjectService {
         }
         if ("KAFKA_LOGICAL_CONSUMER_GROUP".equals(objectType)) {
             return "KAFKA_CONSUMER_GROUP";
+        }
+        if ("ES_LOGICAL_INDEX".equals(objectType)) {
+            return "ES_INDEX";
         }
         if ("APPLICATION_LOGICAL_SERVICE".equals(objectType)) {
             return "APPLICATION_INSTANCE";
