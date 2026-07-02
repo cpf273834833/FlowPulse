@@ -41,7 +41,8 @@ public interface ResourceMetricConfigMapper {
     ResourceMetricConfigEntity selectByObjectMetric(@Param("tenantId") String tenantId,
                                                     @Param("objectType") String objectType,
                                                     @Param("objectId") String objectId,
-                                                    @Param("metricDefinitionId") String metricDefinitionId);
+                                                    @Param("metricDefinitionId") String metricDefinitionId,
+                                                    @Param("parameterSignature") String parameterSignature);
 
     List<ResourceMetricConfigEntity> selectDueTasks(@Param("now") long now, @Param("limit") int limit);
 

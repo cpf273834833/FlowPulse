@@ -35,7 +35,8 @@ public abstract class AbstractScriptMetricCollector implements MetricCollector {
         return script;
     }
 
-    protected String envValue(ResourceMetricConfigEntity config, String key) {
+    protected String envValue(MetricCollectContext context, String key) {
+        ResourceMetricConfigEntity config = context.getConfig();
         if ("FP_TENANT_ID".equals(key)) {
             return config.getTenantId();
         }
@@ -52,7 +53,7 @@ public abstract class AbstractScriptMetricCollector implements MetricCollector {
             return config.getObjectName();
         }
         if ("FP_PARAMETER_JSON".equals(key)) {
-            return config.getParameterJson();
+            return context.getResolvedParameterJson();
         }
         return "";
     }

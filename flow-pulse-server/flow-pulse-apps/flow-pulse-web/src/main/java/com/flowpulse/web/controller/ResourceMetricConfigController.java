@@ -3,6 +3,7 @@ package com.flowpulse.web.controller;
 import com.flowpulse.common.ApiResponse;
 import com.flowpulse.metric.api.request.ResourceMetricConfigQueryRequest;
 import com.flowpulse.metric.api.request.ResourceMetricConfigSaveRequest;
+import com.flowpulse.metric.api.response.MetricSampleResponse;
 import com.flowpulse.metric.api.response.ResourceMetricConfigPageResponse;
 import com.flowpulse.metric.api.response.ResourceMetricConfigResponse;
 import com.flowpulse.metric.application.ResourceMetricConfigService;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.util.List;
 
 @Validated
 @RestController
@@ -41,6 +43,11 @@ public class ResourceMetricConfigController {
     @GetMapping("/{id}")
     public ApiResponse<ResourceMetricConfigResponse> detail(HttpServletRequest request, @PathVariable String id) {
         return ApiResponse.success(resourceMetricConfigService.detail(tenantIdResolver.resolve(request), id));
+    }
+
+    @GetMapping("/{id}/samples/latest")
+    public ApiResponse<List<MetricSampleResponse>> latestSamples(HttpServletRequest request, @PathVariable String id) {
+        return ApiResponse.success(resourceMetricConfigService.latestSamples(tenantIdResolver.resolve(request), id));
     }
 
     @PostMapping

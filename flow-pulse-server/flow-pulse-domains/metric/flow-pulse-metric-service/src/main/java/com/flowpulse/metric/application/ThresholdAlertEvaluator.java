@@ -45,7 +45,7 @@ public class ThresholdAlertEvaluator {
     }
 
     public void evaluate(ResourceMetricConfigEntity config, double value, long evaluatedAt) {
-        List<ThresholdRuleEntity> rules = thresholdRuleMapper.selectEnabledResourceRules(
+        List<ThresholdRuleEntity> rules = thresholdRuleMapper.selectEnabledRulesForMetricObject(
                 config.getTenantId(), config.getMetricDefinitionId(), config.getObjectType(), config.getObjectId());
         for (ThresholdRuleEntity rule : rules) {
             EvaluationResult result = evaluateRule(rule, value);
@@ -66,6 +66,9 @@ public class ThresholdAlertEvaluator {
                 return result;
             }
             for (JsonNode condition : conditions) {
+                if (condition.has("enabled") && !condition.get("enabled").asBoolean(true)) {
+                    continue;
+                }
                 String severity = upper(text(condition, "severity", "WARNING"));
                 String operator = text(condition, "operator", ">=");
                 JsonNode thresholdNode = condition.get("value");
@@ -91,15 +94,16 @@ public class ThresholdAlertEvaluator {
                          EvaluationResult result,
                          double value,
                          long evaluatedAt) {
-        String alertKey = alertKey(rule, config);
-        AlertStateEntity state = alertStateMapper.selectByAlertKey(config.getTenantId(), alertKey);
+        String baseAlertKey = alertKey(rule, config);
+        AlertStateEntity state = alertStateMapper.selectActiveByBaseAlertKey(config.getTenantId(), baseAlertKey);
         String previousLevel = state == null ? "NORMAL" : state.getCurrentLevel();
+        boolean newIncident = state == null;
         boolean changed = state == null || !result.level.equals(previousLevel) || !"ACTIVE".equals(state.getStatus());
         if (state == null) {
             state = new AlertStateEntity();
             state.setId(IdGenerator.nextId());
             state.setTenantId(config.getTenantId());
-            state.setAlertKey(alertKey);
+            state.setAlertKey(incidentAlertKey(baseAlertKey, evaluatedAt));
             state.setFirstTriggeredAt(Long.valueOf(evaluatedAt));
             state.setCreatedAt(Long.valueOf(evaluatedAt));
             state.setAcknowledged(Boolean.FALSE);
@@ -118,7 +122,7 @@ public class ThresholdAlertEvaluator {
         if (state.getAcknowledged() == null) {
             state.setAcknowledged(Boolean.FALSE);
         }
-        if (alertStateMapper.selectByAlertKey(config.getTenantId(), alertKey) == null) {
+        if (newIncident) {
             alertStateMapper.insert(state);
         } else {
             alertStateMapper.update(state);
@@ -129,8 +133,8 @@ public class ThresholdAlertEvaluator {
     }
 
     private void recover(ThresholdRuleEntity rule, ResourceMetricConfigEntity config, double value, long evaluatedAt) {
-        String alertKey = alertKey(rule, config);
-        AlertStateEntity state = alertStateMapper.selectByAlertKey(config.getTenantId(), alertKey);
+        String baseAlertKey = alertKey(rule, config);
+        AlertStateEntity state = alertStateMapper.selectActiveByBaseAlertKey(config.getTenantId(), baseAlertKey);
         if (state == null) {
             return;
         }
@@ -160,9 +164,9 @@ public class ThresholdAlertEvaluator {
         state.setObjectId(config.getObjectId());
         state.setObjectCode(config.getObjectCode());
         state.setObjectName(config.getObjectName());
-        state.setTopologyId("");
-        state.setTopologyElementId("");
-        state.setTopologyElementType("");
+        state.setTopologyId(defaultText(rule.getTopologyId(), ""));
+        state.setTopologyElementId(defaultText(rule.getTopologyElementId(), ""));
+        state.setTopologyElementType(defaultText(rule.getTopologyElementType(), ""));
     }
 
     private void insertEvent(AlertStateEntity state,
@@ -190,7 +194,14 @@ public class ThresholdAlertEvaluator {
     }
 
     private String alertKey(ThresholdRuleEntity rule, ResourceMetricConfigEntity config) {
+        if ("TOPOLOGY_ELEMENT".equals(upper(rule.getScopeType()))) {
+            return rule.getId() + ":TOPOLOGY:" + defaultText(rule.getTopologyElementId(), config.getObjectId());
+        }
         return rule.getId() + ":" + config.getObjectType() + ":" + config.getObjectId();
+    }
+
+    private String incidentAlertKey(String baseAlertKey, long triggeredAt) {
+        return baseAlertKey + ":" + triggeredAt;
     }
 
     private String message(ThresholdRuleEntity rule, EvaluationResult result, double value) {
@@ -237,6 +248,11 @@ public class ThresholdAlertEvaluator {
 
     private String upper(String value) {
         return value == null ? "" : value.trim().toUpperCase();
+    }
+
+    private String defaultText(String value, String defaultValue) {
+        String text = value == null ? "" : value.trim();
+        return text.length() == 0 ? defaultValue : text;
     }
 
     private long safeLong(Long value, long defaultValue) {

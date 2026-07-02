@@ -1,5 +1,7 @@
 package com.flowpulse.metric.application;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowpulse.common.BusinessException;
 import com.flowpulse.common.ErrorCode;
 import com.flowpulse.common.IdGenerator;
@@ -9,13 +11,16 @@ import com.flowpulse.executor.infrastructure.persistence.mapper.ExecutorNodeMapp
 import com.flowpulse.metric.api.request.ResourceMetricConfigQueryRequest;
 import com.flowpulse.metric.api.request.ResourceMetricConfigSaveRequest;
 import com.flowpulse.metric.api.response.PageResponse;
+import com.flowpulse.metric.api.response.MetricSampleResponse;
 import com.flowpulse.metric.api.response.ResourceMetricConfigPageResponse;
 import com.flowpulse.metric.api.response.ResourceMetricConfigResponse;
 import com.flowpulse.metric.domain.model.MetricDefinitionEntity;
 import com.flowpulse.metric.domain.model.MetricImplementationEntity;
+import com.flowpulse.metric.domain.model.MetricSampleEntity;
 import com.flowpulse.metric.domain.model.ResourceMetricConfigEntity;
 import com.flowpulse.metric.infrastructure.persistence.mapper.MetricDefinitionMapper;
 import com.flowpulse.metric.infrastructure.persistence.mapper.MetricImplementationMapper;
+import com.flowpulse.metric.infrastructure.persistence.mapper.MetricSampleMapper;
 import com.flowpulse.metric.infrastructure.persistence.mapper.ResourceMetricConfigMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +31,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 @Service
 public class ResourceMetricConfigService {
@@ -35,15 +43,21 @@ public class ResourceMetricConfigService {
     private final MetricImplementationMapper metricImplementationMapper;
     private final ResourceMetricConfigMapper resourceMetricConfigMapper;
     private final ExecutorNodeMapper executorNodeMapper;
+    private final MetricSampleMapper metricSampleMapper;
+    private final ObjectMapper objectMapper;
 
     public ResourceMetricConfigService(MetricDefinitionMapper metricDefinitionMapper,
                                        MetricImplementationMapper metricImplementationMapper,
                                        ResourceMetricConfigMapper resourceMetricConfigMapper,
-                                       ExecutorNodeMapper executorNodeMapper) {
+                                       ExecutorNodeMapper executorNodeMapper,
+                                       MetricSampleMapper metricSampleMapper,
+                                       ObjectMapper objectMapper) {
         this.metricDefinitionMapper = metricDefinitionMapper;
         this.metricImplementationMapper = metricImplementationMapper;
         this.resourceMetricConfigMapper = resourceMetricConfigMapper;
         this.executorNodeMapper = executorNodeMapper;
+        this.metricSampleMapper = metricSampleMapper;
+        this.objectMapper = objectMapper;
     }
 
     public ResourceMetricConfigPageResponse page(String tenantId, ResourceMetricConfigQueryRequest request) {
@@ -74,6 +88,11 @@ public class ResourceMetricConfigService {
 
     public ResourceMetricConfigResponse detail(String tenantId, String id) {
         return toResponse(require(tenantId, id));
+    }
+
+    public List<MetricSampleResponse> latestSamples(String tenantId, String configId) {
+        require(tenantId, configId);
+        return toSampleResponses(metricSampleMapper.selectLatestSeriesByConfigId(tenantId, configId));
     }
 
     @Transactional
@@ -120,7 +139,9 @@ public class ResourceMetricConfigService {
         }
         MetricImplementationEntity implementation = resolveImplementation(tenantId, definition.getId(), request.getImplementationId());
         String executionMode = trim(request.getExecutionMode());
-        if (executionMode.length() == 0 && implementation != null) {
+        if (isBuiltInImplementation(implementation)) {
+            executionMode = trim(implementation.getExecutionMode());
+        } else if (executionMode.length() == 0 && implementation != null) {
             executionMode = implementation.getExecutionMode();
         }
         entity.setObjectType(upper(request.getObjectType()));
@@ -133,9 +154,23 @@ public class ResourceMetricConfigService {
         entity.setExecutorNodeId(trim(request.getExecutorNodeId()));
         entity.setIntervalSec(request.getIntervalSec() == null ? Integer.valueOf(60) : request.getIntervalSec());
         entity.setParameterJson(trim(request.getParameterJson()));
+        entity.setParameterSignature(parameterSignature(entity.getParameterJson()));
         entity.setEnabled(request.getEnabled() == null ? Boolean.TRUE : request.getEnabled());
         entity.setDescription(trim(request.getDescription()));
         validateExecutionChannel(tenantId, entity);
+    }
+
+    private boolean isBuiltInImplementation(MetricImplementationEntity implementation) {
+        if (implementation == null) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(implementation.getSystemBuiltin())) {
+            return true;
+        }
+        String implementationType = upper(implementation.getImplementationType());
+        return "JAVA".equals(implementationType)
+                || "BUILT_IN".equals(implementationType)
+                || trim(implementation.getBuiltInCollector()).length() > 0;
     }
 
     private void validateExecutionChannel(String tenantId, ResourceMetricConfigEntity entity) {
@@ -192,7 +227,8 @@ public class ResourceMetricConfigService {
 
     private void assertUnique(String tenantId, String currentId, ResourceMetricConfigSaveRequest request) {
         ResourceMetricConfigEntity entity = resourceMetricConfigMapper.selectByObjectMetric(
-                tenantId, upper(request.getObjectType()), trim(request.getObjectId()), trim(request.getMetricDefinitionId()));
+                tenantId, upper(request.getObjectType()), trim(request.getObjectId()), trim(request.getMetricDefinitionId()),
+                parameterSignature(trim(request.getParameterJson())));
         if (entity != null && !entity.getId().equals(currentId)) {
             throw new BusinessException(ErrorCode.CONFLICT, "metric.resource.config.exists");
         }
@@ -224,6 +260,7 @@ public class ResourceMetricConfigService {
         response.setExecutorNodeId(entity.getExecutorNodeId());
         response.setIntervalSec(entity.getIntervalSec());
         response.setParameterJson(entity.getParameterJson());
+        response.setParameterSignature(entity.getParameterSignature());
         response.setEnabled(entity.getEnabled());
         response.setTaskStatus(entity.getTaskStatus());
         response.setLastCollectStatus(entity.getLastCollectStatus());
@@ -236,6 +273,32 @@ public class ResourceMetricConfigService {
         response.setCreatedAt(entity.getCreatedAt());
         response.setUpdatedAt(entity.getUpdatedAt());
         return response;
+    }
+
+    private List<MetricSampleResponse> toSampleResponses(List<MetricSampleEntity> rows) {
+        List<MetricSampleResponse> responses = new ArrayList<MetricSampleResponse>();
+        if (rows == null) {
+            return responses;
+        }
+        for (MetricSampleEntity row : rows) {
+            MetricSampleResponse response = new MetricSampleResponse();
+            response.setId(row.getId());
+            response.setConfigId(row.getConfigId());
+            response.setMetricCode(row.getMetricCode());
+            response.setObjectType(row.getObjectType());
+            response.setObjectId(row.getObjectId());
+            response.setObjectCode(row.getObjectCode());
+            response.setInfrastructureType(row.getInfrastructureType());
+            response.setInfrastructureId(row.getInfrastructureId());
+            response.setInstance(row.getInstance());
+            response.setSeriesType(row.getSeriesType());
+            response.setQuality(row.getQuality());
+            response.setValue(row.getValue());
+            response.setCollectedAt(row.getCollectedAt());
+            response.setMetadataJson(row.getMetadataJson());
+            responses.add(response);
+        }
+        return responses;
     }
 
     private List<StatCard> buildStats(String tenantId) {
@@ -277,5 +340,40 @@ public class ResourceMetricConfigService {
 
     private String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String parameterSignature(String parameterJson) {
+        return sha256(canonicalParameterJson(parameterJson));
+    }
+
+    private String canonicalParameterJson(String parameterJson) {
+        String text = trim(parameterJson);
+        if (text.length() == 0) {
+            return "";
+        }
+        try {
+            JsonNode node = objectMapper.readTree(text);
+            return objectMapper.writeValueAsString(node);
+        } catch (Exception exception) {
+            return text;
+        }
+    }
+
+    private String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] encoded = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(encoded.length * 2);
+            for (byte item : encoded) {
+                String hex = Integer.toHexString(0xff & item);
+                if (hex.length() == 1) {
+                    builder.append('0');
+                }
+                builder.append(hex);
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is not available.", exception);
+        }
     }
 }

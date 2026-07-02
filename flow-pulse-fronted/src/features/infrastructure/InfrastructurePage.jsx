@@ -1059,6 +1059,8 @@ function InfrastructureMetricCard({ row, alert, executorIndex, onAdd, onEdit, on
       </div>
 
       <div className="fp-infra-metric-facts">
+        <MetricFact label={t('infrastructure.currentMetricValue')} value={`${currentValue}${valueUnit ? ` ${valueUnit}` : ''}`} important />
+        <MetricFact label={t('collectionTask.lastCollectAt')} value={config ? formatTime(config.currentValueAt || config.lastCollectAt) : '-'} />
         <MetricFact label={t('metric.collectStatus')} value={collectStatus} tone={collectError ? 'danger' : ''} />
         {hasAlert ? <MetricFact label={t('infrastructure.activeAlert')} value={alert.message || levelText(alert.currentLevel)} tone="danger" wide /> : null}
         <MetricFact label={t('collectionTask.lastMessage')} value={config && config.lastCollectMessage ? config.lastCollectMessage : '-'} tone={collectError ? 'danger' : ''} wide={collectError} />
@@ -1066,8 +1068,6 @@ function InfrastructureMetricCard({ row, alert, executorIndex, onAdd, onEdit, on
         <MetricFact label={t('metric.executionMode')} value={config ? labelExecution(config.executionMode) : '-'} />
         {config && config.executionMode === 'SSH' ? <MetricFact label={t('collectionTask.executorNode')} value={executorText} tone={!executorNode ? 'danger' : ''} /> : null}
         <MetricFact label={t('metric.interval')} value={config ? `${config.intervalSec || '-'}s` : '-'} />
-        <MetricFact label={t('collectionTask.lastCollectAt')} value={config ? formatTime(config.lastCollectAt) : '-'} />
-        <MetricFact label={t('infrastructure.currentMetricAt')} value={config ? formatTime(config.currentValueAt) : '-'} />
         <MetricFact label={t('infrastructure.threshold')} value={thresholdText} important={thresholds.length > 0} />
       </div>
 

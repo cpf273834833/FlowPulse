@@ -11,6 +11,11 @@
         <result property="objectType" column="object_type"/>
         <result property="objectId" column="object_id"/>
         <result property="objectCode" column="object_code"/>
+        <result property="infrastructureType" column="infrastructure_type"/>
+        <result property="infrastructureId" column="infrastructure_id"/>
+        <result property="instance" column="instance"/>
+        <result property="seriesType" column="series_type"/>
+        <result property="quality" column="quality"/>
         <result property="value" column="metric_value"/>
         <result property="collectedAt" column="collected_at"/>
         <result property="metadataJson" column="metadata_json"/>
@@ -20,16 +25,70 @@
     <insert id="insert" parameterType="com.flowpulse.metric.domain.model.MetricSampleEntity">
         insert into fp_metric_sample
         (id, tenant_id, config_id, metric_definition_id, metric_code, object_type, object_id, object_code,
+         infrastructure_type, infrastructure_id, instance, series_type, quality,
          metric_value, collected_at, metadata_json, created_at)
         values
         (#{id}, #{tenantId}, #{configId}, #{metricDefinitionId}, #{metricCode}, #{objectType}, #{objectId}, #{objectCode},
+         #{infrastructureType}, #{infrastructureId}, #{instance}, #{seriesType}, #{quality},
          #{value}, #{collectedAt}, #{metadataJson}, #{createdAt})
     </insert>
 
     <select id="selectLatestByConfigId" resultMap="MetricSampleMap">
         select * from fp_metric_sample
         where tenant_id = #{tenantId} and config_id = #{configId}
+          and series_type = 'AGGREGATE' and instance = '__TOTAL__'
         order by collected_at desc
         limit 1
+    </select>
+
+    <select id="selectLatestSeriesByConfigId" resultMap="MetricSampleMap">
+        select * from fp_metric_sample
+        where tenant_id = #{tenantId}
+          and config_id = #{configId}
+          and collected_at = (
+              select max(collected_at) from fp_metric_sample
+              where tenant_id = #{tenantId} and config_id = #{configId}
+          )
+        order by case when series_type = 'AGGREGATE' then 0 else 1 end, instance asc
+    </select>
+
+    <select id="selectLatestByMetricObjectSeries" resultMap="MetricSampleMap">
+        select * from fp_metric_sample
+        where tenant_id = #{tenantId}
+          and metric_code = #{metricCode}
+          and object_type = #{objectType}
+          and object_id = #{objectId}
+          and instance = #{instance}
+          and series_type = #{seriesType}
+        order by collected_at desc
+        limit 1
+    </select>
+
+    <select id="selectPreviousByMetricObjectSeries" resultMap="MetricSampleMap">
+        select * from fp_metric_sample
+        where tenant_id = #{tenantId}
+          and metric_code = #{metricCode}
+          and object_type = #{objectType}
+          and object_id = #{objectId}
+          and instance = #{instance}
+          and series_type = #{seriesType}
+          and collected_at &lt; #{beforeAt}
+        order by collected_at desc
+        limit 1
+    </select>
+
+    <select id="selectLatestSeriesByMetricObject" resultMap="MetricSampleMap">
+        select * from fp_metric_sample
+        where tenant_id = #{tenantId}
+          and metric_code = #{metricCode}
+          and object_type = #{objectType}
+          and object_id = #{objectId}
+          and collected_at = (
+              select max(collected_at) from fp_metric_sample
+              where tenant_id = #{tenantId}
+                and metric_code = #{metricCode}
+                and object_type = #{objectType}
+                and object_id = #{objectId}
+          )
     </select>
 </mapper>

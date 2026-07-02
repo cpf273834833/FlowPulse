@@ -9,6 +9,10 @@ public class TopologyEdgeResponse {
     private String targetNodeId;
     private String relationType;
     private String relationId;
+    private String sourceObjectType;
+    private String sourceObjectId;
+    private String targetObjectType;
+    private String targetObjectId;
     private String pathJson;
     private String labelPositionJson;
     private String styleJson;
@@ -33,6 +37,14 @@ public class TopologyEdgeResponse {
     public void setRelationType(String relationType) { this.relationType = relationType; }
     public String getRelationId() { return relationId; }
     public void setRelationId(String relationId) { this.relationId = relationId; }
+    public String getSourceObjectType() { return sourceObjectType; }
+    public void setSourceObjectType(String sourceObjectType) { this.sourceObjectType = sourceObjectType; }
+    public String getSourceObjectId() { return sourceObjectId; }
+    public void setSourceObjectId(String sourceObjectId) { this.sourceObjectId = sourceObjectId; }
+    public String getTargetObjectType() { return targetObjectType; }
+    public void setTargetObjectType(String targetObjectType) { this.targetObjectType = targetObjectType; }
+    public String getTargetObjectId() { return targetObjectId; }
+    public void setTargetObjectId(String targetObjectId) { this.targetObjectId = targetObjectId; }
     public String getPathJson() { return pathJson; }
     public void setPathJson(String pathJson) { this.pathJson = pathJson; }
     public String getLabelPositionJson() { return labelPositionJson; }

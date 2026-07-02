@@ -40,6 +40,11 @@ public class JsonMetricValueReader {
         return value == null || value.isNull() ? "" : value.asText();
     }
 
+    public JsonNode readTree(String jsonText) {
+        JsonNode json = tryReadJson(jsonText);
+        return json == null ? objectMapper.createObjectNode() : json;
+    }
+
     private JsonNode tryReadJson(String text) {
         if (text == null || text.trim().length() == 0) {
             return null;

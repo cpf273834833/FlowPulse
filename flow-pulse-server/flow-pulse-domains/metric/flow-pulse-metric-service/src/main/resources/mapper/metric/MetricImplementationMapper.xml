@@ -14,11 +14,11 @@
         <result property="executionMode" column="execution_mode"/>
         <result property="scriptLanguage" column="script_language"/>
         <result property="scriptContent" column="script_content"/>
-        <result property="configJson" column="config_json"/>
         <result property="parameterSchemaJson" column="parameter_schema_json"/>
         <result property="outputSchemaJson" column="output_schema_json"/>
         <result property="builtInCollector" column="built_in_collector"/>
         <result property="defaultImplementation" column="default_implementation"/>
+        <result property="systemBuiltin" column="system_builtin"/>
         <result property="enabled" column="enabled"/>
         <result property="timeoutSec" column="timeout_sec"/>
         <result property="description" column="description"/>
@@ -103,12 +103,12 @@
     <insert id="insert" parameterType="com.flowpulse.metric.domain.model.MetricImplementationEntity">
         insert into fp_metric_implementation
         (id, tenant_id, metric_definition_id, implementation_code, implementation_name, implementation_type,
-         execution_mode, script_language, script_content, config_json, parameter_schema_json, output_schema_json,
-         built_in_collector, default_implementation, enabled, timeout_sec, description, created_at, updated_at)
+         execution_mode, script_language, script_content, parameter_schema_json, output_schema_json,
+         built_in_collector, default_implementation, system_builtin, enabled, timeout_sec, description, created_at, updated_at)
         values
         (#{id}, #{tenantId}, #{metricDefinitionId}, #{implementationCode}, #{implementationName}, #{implementationType},
-         #{executionMode}, #{scriptLanguage}, #{scriptContent}, #{configJson}, #{parameterSchemaJson}, #{outputSchemaJson},
-         #{builtInCollector}, #{defaultImplementation}, #{enabled}, #{timeoutSec}, #{description}, #{createdAt}, #{updatedAt})
+         #{executionMode}, #{scriptLanguage}, #{scriptContent}, #{parameterSchemaJson}, #{outputSchemaJson},
+         #{builtInCollector}, #{defaultImplementation}, #{systemBuiltin}, #{enabled}, #{timeoutSec}, #{description}, #{createdAt}, #{updatedAt})
     </insert>
 
     <update id="update" parameterType="com.flowpulse.metric.domain.model.MetricImplementationEntity">
@@ -116,8 +116,9 @@
         set metric_definition_id = #{metricDefinitionId}, implementation_code = #{implementationCode},
             implementation_name = #{implementationName}, implementation_type = #{implementationType},
             execution_mode = #{executionMode}, script_language = #{scriptLanguage}, script_content = #{scriptContent},
-            config_json = #{configJson}, parameter_schema_json = #{parameterSchemaJson}, output_schema_json = #{outputSchemaJson},
+            parameter_schema_json = #{parameterSchemaJson}, output_schema_json = #{outputSchemaJson},
             built_in_collector = #{builtInCollector}, default_implementation = #{defaultImplementation},
+            system_builtin = #{systemBuiltin},
             enabled = #{enabled}, timeout_sec = #{timeoutSec}, description = #{description}, updated_at = #{updatedAt}
         where tenant_id = #{tenantId} and id = #{id}
     </update>

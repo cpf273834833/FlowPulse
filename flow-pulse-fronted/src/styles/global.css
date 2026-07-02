@@ -725,6 +725,60 @@ select {
   font-size: 12px;
 }
 
+.fp-compute-children {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(104, 158, 220, 0.16);
+  border-radius: 12px;
+  background: rgba(3, 12, 26, 0.24);
+}
+
+.fp-compute-children__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+
+.fp-compute-child {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 86px 86px minmax(240px, auto);
+  gap: 10px;
+  align-items: center;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid rgba(104, 158, 220, 0.14);
+  border-radius: 10px;
+  background: rgba(7, 18, 34, 0.5);
+}
+
+.fp-compute-child__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fp-compute-child__main strong,
+.fp-compute-child__main em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-compute-child__main strong {
+  color: #f4fbff;
+}
+
+.fp-compute-child__main em {
+  color: var(--fp-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
 .fp-config-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1153,6 +1207,60 @@ select {
   outline: none;
 }
 
+select,
+.fp-native-select,
+.fp-field select,
+.fp-topology-select,
+.fp-topology-editor select,
+.fp-topology-inline-form select,
+.fp-threshold-step-row select,
+.fp-pagination select {
+  appearance: none;
+  border: 1px solid rgba(104, 158, 220, 0.24);
+  border-radius: 11px;
+  color: var(--fp-text);
+  background-color: rgba(4, 12, 24, 0.86);
+  background-image:
+    linear-gradient(45deg, transparent 50%, #6fd6ff 50%),
+    linear-gradient(135deg, #6fd6ff 50%, transparent 50%),
+    linear-gradient(90deg, rgba(104, 158, 220, 0.12), rgba(104, 158, 220, 0.02));
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%,
+    100% 0;
+  background-size: 6px 6px, 6px 6px, 42px 100%;
+  background-repeat: no-repeat;
+  padding-right: 40px;
+  outline: none;
+}
+
+select:focus,
+.fp-native-select:focus,
+.fp-field select:focus,
+.fp-topology-select:focus,
+.fp-topology-editor select:focus,
+.fp-topology-inline-form select:focus,
+.fp-threshold-step-row select:focus,
+.fp-pagination select:focus {
+  border-color: rgba(40, 184, 255, 0.78);
+  box-shadow: 0 0 0 3px rgba(40, 184, 255, 0.12);
+}
+
+select option {
+  color: #eaf5ff;
+  background: #07111f;
+}
+
+input[type='number'] {
+  appearance: textfield;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
 .fp-field textarea {
   min-height: 118px;
   resize: vertical;
@@ -1162,16 +1270,6 @@ select {
 
 .fp-field--wide {
   grid-column: 1 / -1;
-}
-
-.fp-field select {
-  appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, var(--fp-primary) 50%),
-    linear-gradient(135deg, var(--fp-primary) 50%, transparent 50%);
-  background-position: calc(100% - 16px) 50%, calc(100% - 10px) 50%;
-  background-size: 6px 6px, 6px 6px;
-  background-repeat: no-repeat;
-  padding-right: 30px;
 }
 
 .fp-field select option {
@@ -1386,6 +1484,7 @@ select {
 }
 
 .fp-infra-tree button {
+  position: relative;
   width: 100%;
   border: 1px solid transparent;
   border-radius: 12px;
@@ -1403,6 +1502,47 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 700;
+}
+
+.fp-tree-group > button {
+  border-color: rgba(40, 184, 255, 0.2);
+  background:
+    linear-gradient(90deg, rgba(40, 184, 255, 0.14), rgba(40, 184, 255, 0.03));
+}
+
+.fp-tree-group > button::after,
+.fp-tree-management > button::after,
+button.fp-tree-management::after,
+.fp-tree-compute > button::after,
+button.fp-tree-compute::after {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  content: '环境';
+}
+
+.fp-tree-group > button::after {
+  color: #7dd3fc;
+  background: rgba(40, 184, 255, 0.13);
+}
+
+.fp-tree-management > button::after,
+button.fp-tree-management::after {
+  color: #ffcf7a;
+  background: rgba(255, 186, 92, 0.13);
+  content: '管理区';
+}
+
+.fp-tree-compute > button::after,
+button.fp-tree-compute::after {
+  color: #61ead9;
+  background: rgba(73, 215, 208, 0.12);
+  content: '计算区';
 }
 
 .fp-infra-tree button em {
@@ -1436,6 +1576,12 @@ select {
   position: relative;
 }
 
+.fp-tree-management > button,
+button.fp-tree-management {
+  border-color: rgba(255, 186, 92, 0.1);
+  background: rgba(255, 186, 92, 0.035);
+}
+
 .fp-tree-management::before,
 .fp-tree-compute::before {
   position: absolute;
@@ -1455,6 +1601,11 @@ select {
 
 .fp-tree-compute {
   position: relative;
+}
+
+.fp-tree-compute > button,
+button.fp-tree-compute {
+  border-color: rgba(73, 215, 208, 0.12);
   background: rgba(40, 184, 255, 0.035) !important;
 }
 
@@ -1468,6 +1619,15 @@ select {
 
 .fp-tree-compute em {
   color: #49d7d0 !important;
+}
+
+.fp-tree-group > button::after,
+.fp-tree-management > button::after,
+button.fp-tree-management::after,
+.fp-tree-compute > button::after,
+button.fp-tree-compute::after {
+  display: none;
+  content: none;
 }
 
 .fp-infra-content {
@@ -1894,6 +2054,48 @@ select {
   margin-top: 6px;
 }
 
+.fp-page .fp-form-header,
+.fp-page .fp-detail-hero {
+  align-items: center;
+  min-height: auto;
+  padding: 12px 16px;
+  border-radius: 16px;
+}
+
+.fp-page .fp-form-header h1,
+.fp-page .fp-detail-hero h1 {
+  margin: 2px 0 4px;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.fp-page .fp-form-header p,
+.fp-page .fp-detail-hero p {
+  max-width: 820px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.fp-page .fp-detail-section {
+  padding: 14px;
+  border-radius: 16px;
+}
+
+.fp-page .fp-detail-section h2 {
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.fp-page .fp-info-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.fp-page .fp-info-box {
+  padding: 11px 12px;
+  border-radius: 12px;
+}
+
 .fp-data-table {
   overflow: hidden;
   border: 1px solid var(--fp-border);
@@ -1979,12 +2181,7 @@ select {
 .fp-field select {
   width: 100%;
   height: 42px;
-  padding: 0 36px 0 14px;
-  border: 1px solid rgba(104, 139, 190, 0.28);
-  border-radius: 12px;
-  color: var(--fp-text);
-  background: rgba(4, 15, 33, 0.88);
-  outline: none;
+  padding: 0 42px 0 14px;
 }
 
 .fp-native-select:focus,
@@ -2366,16 +2563,16 @@ select {
 }
 
 .fp-infra-metric-board {
-  padding: 12px 14px 14px;
+  padding: 10px 12px 12px;
 }
 
 .fp-infra-metric-board__head {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(480px, 0.9fr);
-  gap: 14px;
+  grid-template-columns: minmax(220px, 1fr) minmax(420px, 0.85fr);
+  gap: 12px;
   align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(104, 158, 220, 0.14);
 }
 
@@ -2395,13 +2592,13 @@ select {
 
 .fp-infra-metric-summary {
   display: grid;
-  grid-template-columns: repeat(5, minmax(72px, 1fr));
+  grid-template-columns: repeat(5, minmax(62px, 1fr));
   gap: 8px;
 }
 
 .fp-infra-metric-summary__item {
   min-width: 0;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border: 1px solid rgba(104, 158, 220, 0.18);
   border-radius: 14px;
   background: rgba(3, 12, 26, 0.34);
@@ -2438,15 +2635,16 @@ select {
 
 .fp-infra-metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   gap: 12px;
+  align-items: start;
 }
 
 .fp-infra-metric-tile {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid rgba(104, 158, 220, 0.18);
   border-radius: 18px;
   background:
@@ -2555,7 +2753,7 @@ select {
 }
 
 .fp-infra-metric-value {
-  padding: 12px;
+  padding: 10px 12px;
   border: 1px solid rgba(104, 158, 220, 0.14);
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.14);
@@ -2584,7 +2782,7 @@ select {
 
 .fp-infra-metric-facts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -2607,7 +2805,7 @@ select {
 }
 
 .fp-infra-metric-facts div.is-wide {
-  grid-column: 1 / -1;
+  grid-column: span 2;
 }
 
 .fp-infra-metric-facts span,
@@ -2627,6 +2825,50 @@ select {
   margin-top: 4px;
   color: #eaf5ff;
   font-size: 12px;
+}
+
+.fp-infra-metric-facts div:nth-child(-n + 3) strong {
+  font-size: 11px;
+}
+
+.fp-field-help-title {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.fp-help-dot,
+.fp-copy-example {
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 999px;
+  color: #7ddcff;
+  background: rgba(14, 165, 233, 0.1);
+  cursor: pointer;
+}
+
+.fp-help-dot {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-weight: 800;
+}
+
+.fp-copy-example {
+  padding: 3px 9px;
+  font-size: 12px;
+}
+
+.fp-inline-example {
+  max-height: 180px;
+  overflow: auto;
+  margin: 4px 0 8px;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 12px;
+  padding: 10px;
+  color: #ccecff;
+  background: rgba(2, 8, 20, 0.72);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .fp-infra-metric-actions {
@@ -2925,7 +3167,7 @@ select {
 
 .fp-metric-workbench {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: start;
 }
@@ -2988,6 +3230,76 @@ select {
 .fp-metric-table--polished .fp-data-table__row.is-selected {
   background: linear-gradient(90deg, rgba(28, 122, 214, 0.18), rgba(9, 28, 55, 0.32));
   box-shadow: inset 3px 0 0 #24b7ff;
+}
+
+.fp-applicability-editor {
+  padding: 12px;
+  border: 1px solid rgba(104, 158, 220, 0.16);
+  border-radius: 14px;
+  background: rgba(3, 12, 26, 0.28);
+}
+
+.fp-applicability-editor__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fp-applicability-editor__head em {
+  color: var(--fp-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.fp-applicability-row {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(104, 158, 220, 0.14);
+  border-radius: 12px;
+  background: rgba(6, 20, 42, 0.36);
+}
+
+.fp-applicability-row__top,
+.fp-applicability-row__fields {
+  display: grid;
+  gap: 8px;
+  align-items: end;
+}
+
+.fp-applicability-row__top {
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+}
+
+.fp-applicability-row__fields {
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+}
+
+.fp-applicability-row label {
+  display: grid;
+  gap: 5px;
+}
+
+.fp-applicability-row label span {
+  color: var(--fp-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fp-applicability-row label.is-wide {
+  grid-column: 1 / -1;
+}
+
+.fp-applicability-row input {
+  height: 42px;
+  border: 1px solid rgba(104, 158, 220, 0.24);
+  border-radius: 11px;
+  color: var(--fp-text);
+  background-color: rgba(4, 12, 24, 0.86);
+  padding: 0 12px;
+  outline: none;
 }
 
 .fp-metric-side {

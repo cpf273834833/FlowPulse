@@ -85,6 +85,7 @@ public class MetricImplementationService {
     @Transactional
     public MetricImplementationResponse update(String tenantId, String id, MetricImplementationSaveRequest request) {
         MetricImplementationEntity entity = require(tenantId, id);
+        assertEditable(entity);
         assertCodeUnique(tenantId, id, request.getImplementationCode());
         fill(tenantId, entity, request);
         entity.setUpdatedAt(Long.valueOf(System.currentTimeMillis()));
@@ -97,7 +98,8 @@ public class MetricImplementationService {
 
     @Transactional
     public void delete(String tenantId, String id) {
-        require(tenantId, id);
+        MetricImplementationEntity entity = require(tenantId, id);
+        assertEditable(entity);
         metricImplementationMapper.deleteById(tenantId, id);
     }
 
@@ -115,11 +117,13 @@ public class MetricImplementationService {
         entity.setExecutionMode(mode);
         entity.setScriptLanguage(trim(request.getScriptLanguage()));
         entity.setScriptContent(trim(request.getScriptContent()));
-        entity.setConfigJson(trim(request.getConfigJson()));
         entity.setParameterSchemaJson(trim(request.getParameterSchemaJson()));
         entity.setOutputSchemaJson(trim(request.getOutputSchemaJson()));
         entity.setBuiltInCollector(trim(request.getBuiltInCollector()));
         entity.setDefaultImplementation(request.getDefaultImplementation() == null ? Boolean.FALSE : request.getDefaultImplementation());
+        if (entity.getSystemBuiltin() == null) {
+            entity.setSystemBuiltin(Boolean.FALSE);
+        }
         entity.setEnabled(request.getEnabled() == null ? Boolean.TRUE : request.getEnabled());
         entity.setTimeoutSec(request.getTimeoutSec() == null ? Integer.valueOf(30) : request.getTimeoutSec());
         entity.setDescription(trim(request.getDescription()));
@@ -150,6 +154,12 @@ public class MetricImplementationService {
         }
     }
 
+    private void assertEditable(MetricImplementationEntity entity) {
+        if (Boolean.TRUE.equals(entity.getSystemBuiltin())) {
+            throw new BusinessException(ErrorCode.CONFLICT, "metric.system.builtin.readonly");
+        }
+    }
+
     private List<MetricImplementationResponse> toResponses(List<MetricImplementationEntity> rows) {
         List<MetricImplementationResponse> responses = new ArrayList<MetricImplementationResponse>();
         for (MetricImplementationEntity row : rows) {
@@ -170,11 +180,11 @@ public class MetricImplementationService {
         response.setExecutionMode(entity.getExecutionMode());
         response.setScriptLanguage(entity.getScriptLanguage());
         response.setScriptContent(entity.getScriptContent());
-        response.setConfigJson(entity.getConfigJson());
         response.setParameterSchemaJson(entity.getParameterSchemaJson());
         response.setOutputSchemaJson(entity.getOutputSchemaJson());
         response.setBuiltInCollector(entity.getBuiltInCollector());
         response.setDefaultImplementation(entity.getDefaultImplementation());
+        response.setSystemBuiltin(entity.getSystemBuiltin());
         response.setEnabled(entity.getEnabled());
         response.setTimeoutSec(entity.getTimeoutSec());
         response.setDescription(entity.getDescription());

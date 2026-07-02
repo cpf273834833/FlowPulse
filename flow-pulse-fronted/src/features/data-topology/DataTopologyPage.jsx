@@ -4,10 +4,13 @@ import { environmentRegionApi } from '../../api/environmentRegionApi';
 import { infrastructureApi } from '../../api/infrastructureApi';
 import { logicalObjectApi } from '../../api/logicalObjectApi';
 import { metricApi } from '../../api/metricApi';
+import { executorNodeApi } from '../../api/executorNodeApi';
 import { thresholdApi } from '../../api/thresholdApi';
+import { alertApi } from '../../api/alertApi';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
 import Toast from '../../components/Toast';
+import { ElementEditor } from './TopologyInspector';
 import './DataTopologyPage.css';
 
 const DEFAULT_QUERY = { pageNo: 1, pageSize: 10, keyword: '' };
@@ -15,12 +18,7 @@ const DEFAULT_FORM = { topologyCode: '', topologyName: '', envId: '', descriptio
 const NODE_SIZE = { width: 238, height: 104 };
 const DEFAULT_VIEWBOX = { x: 0, y: 0, width: 1200, height: 620 };
 const EMPTY_CONFIG_PAGE = { configs: { records: [], total: 0, pageNo: 1, pageSize: 20 }, stats: [] };
-const QUICK_THRESHOLD_SEVERITIES = [
-  ['REMIND', '提醒'],
-  ['WARNING', '警告'],
-  ['ERROR', '错误'],
-  ['CRITICAL', '紧急'],
-];
+
 
 export default function DataTopologyPage() {
   const svgRef = useRef(null);
@@ -45,9 +43,16 @@ export default function DataTopologyPage() {
   const [edgeDraft, setEdgeDraft] = useState(null);
   const [inspectorTab, setInspectorTab] = useState('properties');
   const [metricDefinitions, setMetricDefinitions] = useState([]);
+  const [applicableMetrics, setApplicableMetrics] = useState([]);
   const [metricImplementations, setMetricImplementations] = useState([]);
+  const [executorNodes, setExecutorNodes] = useState([]);
   const [metricConfigs, setMetricConfigs] = useState(EMPTY_CONFIG_PAGE);
   const [thresholdRules, setThresholdRules] = useState([]);
+  const [topologyMetricConfigs, setTopologyMetricConfigs] = useState([]);
+  const [topologyAlerts, setTopologyAlerts] = useState([]);
+  const [showCanvasMetrics, setShowCanvasMetrics] = useState(false);
+  const [canvasFullscreen, setCanvasFullscreen] = useState(false);
+  const [screenFullscreen, setScreenFullscreen] = useState(false);
   const [metricDraft, setMetricDraft] = useState(null);
   const [thresholdDraft, setThresholdDraft] = useState(null);
   const [mode, setMode] = useState('list');
@@ -60,6 +65,11 @@ export default function DataTopologyPage() {
   const usedObjectIds = useMemo(() => new Set(nodes.map((node) => node.objectId)), [nodes]);
   const visibleStats = stats.length ? stats : defaultStats(nodes.length, edges.length);
   const selectedScopeTitle = scopeTitle(envs, regions, selectedEnvId, selectedRegionId);
+  const metricDefinitionMap = useMemo(() => indexById(metricDefinitions), [metricDefinitions]);
+  const canvasRuntime = useMemo(
+    () => buildCanvasRuntime(nodes, edges, topologyMetricConfigs, topologyAlerts, metricDefinitionMap),
+    [nodes, edges, topologyMetricConfigs, topologyAlerts, metricDefinitionMap],
+  );
   const filteredResources = useMemo(() => {
     const keyword = resourceKeyword.trim().toLowerCase();
     let items = resources;
@@ -96,26 +106,53 @@ export default function DataTopologyPage() {
   }, []);
 
   useEffect(() => {
+    function syncFullscreen() {
+      setScreenFullscreen(Boolean(document.fullscreenElement));
+    }
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, []);
+
+  useEffect(() => {
+    if (mode !== 'canvas' || !current) return undefined;
+    const timer = window.setInterval(() => {
+      loadTopologyRuntime(current, nodes, edges);
+    }, 10000);
+    return () => window.clearInterval(timer);
+  }, [mode, current?.id, nodes, edges]);
+
+  useEffect(() => {
     setInspectorTab('properties');
     setMetricDraft(null);
     setThresholdDraft(null);
     if (selectedContext) {
+      loadApplicableMetrics(selectedContext);
       loadMetricConfigs(selectedContext);
       loadThresholdRules(selectedContext);
     } else {
+      setApplicableMetrics([]);
       setMetricConfigs(EMPTY_CONFIG_PAGE);
       setThresholdRules([]);
     }
-  }, [selectedContext?.topologyElementId]);
+  }, [
+    selectedContext?.topologyElementId,
+    selectedContext?.topologyElementType,
+    selectedContext?.objectType,
+    selectedContext?.relationType,
+    selectedContext?.sourceObjectType,
+    selectedContext?.targetObjectType,
+  ]);
 
   async function loadMetricCatalog() {
     try {
-      const [metricPage, implementationPage] = await Promise.all([
+      const [metricPage, implementationPage, executorNodePage] = await Promise.all([
         metricApi.page({ pageNo: 1, pageSize: 500, enabled: 'true' }),
         metricApi.implementationPage({ pageNo: 1, pageSize: 500, enabled: 'true' }),
+        executorNodeApi.page({ pageNo: 1, pageSize: 500 }),
       ]);
       setMetricDefinitions((metricPage.metrics && metricPage.metrics.records) || []);
       setMetricImplementations((implementationPage.implementations && implementationPage.implementations.records) || []);
+      setExecutorNodes((executorNodePage.nodes && executorNodePage.nodes.records) || []);
     } catch (error) {
       showError('指标目录加载失败', error);
     }
@@ -147,13 +184,34 @@ export default function DataTopologyPage() {
     try {
       const response = await topologyApi.detail(id);
       setCurrent(response.topology);
-      setNodes((response.nodes || []).map(normalizeNode));
-      setEdges((response.edges || []).map(normalizeEdge));
+      const nextNodes = (response.nodes || []).map(normalizeNode);
+      const nextEdges = (response.edges || []).map(normalizeEdge);
+      setNodes(nextNodes);
+      setEdges(nextEdges);
       setSelected(null);
       setCanvasViewBox(DEFAULT_VIEWBOX);
       cancelEdgeDraft();
+      await loadTopologyRuntime(response.topology, nextNodes, nextEdges);
     } catch (error) {
       showError('拓扑详情加载失败', error);
+    }
+  }
+
+  async function loadTopologyRuntime(topology = current, nextNodes = nodes, nextEdges = edges) {
+    if (!topology) return;
+    try {
+      const [configResponse, alertResponse] = await Promise.all([
+        metricApi.resourceConfigPage({ pageNo: 1, pageSize: 1000, enabled: 'true' }),
+        alertApi.page({ pageNo: 1, pageSize: 1000, topologyId: topology.id, status: 'ACTIVE' }),
+      ]);
+      const contexts = topologyElementRuntimeKeys(nextNodes, nextEdges);
+      const records = ((configResponse || {}).configs || {}).records || [];
+      setTopologyMetricConfigs(records.filter((config) => contexts.has(runtimeKey(config.objectType, config.objectId))));
+      setTopologyAlerts(((alertResponse || {}).alerts || {}).records || []);
+    } catch (error) {
+      setTopologyMetricConfigs([]);
+      setTopologyAlerts([]);
+      showError('拓扑运行态加载失败', error);
     }
   }
 
@@ -165,7 +223,24 @@ export default function DataTopologyPage() {
   function backToList() {
     setMode('list');
     setSelected(null);
+    setCanvasFullscreen(false);
     cancelEdgeDraft();
+  }
+
+  async function toggleScreenFullscreen() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      setCanvasFullscreen(true);
+      const target = document.querySelector('.fp-topology-editor-page') || document.documentElement;
+      if (target.requestFullscreen) {
+        await target.requestFullscreen();
+      }
+    } catch (error) {
+      showError('全屏切换失败', error);
+    }
   }
 
   function selectScope(envId, regionId) {
@@ -443,8 +518,8 @@ export default function DataTopologyPage() {
     }
     if (!dragging) return;
     const point = svgPoint(event);
-    const nextX = clamp(point.x - dragging.offsetX, 20, 1180 - NODE_SIZE.width);
-    const nextY = clamp(point.y - dragging.offsetY, 20, 600 - NODE_SIZE.height);
+    const nextX = clamp(point.x - dragging.offsetX, canvasViewBox.x + 20, canvasViewBox.x + canvasViewBox.width - NODE_SIZE.width - 20);
+    const nextY = clamp(point.y - dragging.offsetY, canvasViewBox.y + 20, canvasViewBox.y + canvasViewBox.height - NODE_SIZE.height - 20);
     setNodes((items) => items.map((node) => (node.id === dragging.nodeId ? { ...node, x: nextX, y: nextY } : node)));
     setSelected((currentValue) => {
       if (!currentValue || currentValue.type !== 'node' || currentValue.data.id !== dragging.nodeId) return currentValue;
@@ -490,6 +565,8 @@ export default function DataTopologyPage() {
     if (!current || !selected) return null;
     const data = selected.data;
     const isNode = selected.type === 'node';
+    const source = isNode ? null : nodeMap[data.sourceNodeId];
+    const target = isNode ? null : nodeMap[data.targetNodeId];
     return {
       topologyId: current.id,
       topologyName: current.topologyName,
@@ -499,6 +576,9 @@ export default function DataTopologyPage() {
       objectId: isNode ? data.objectId : data.id,
       objectCode: isNode ? data.objectCode : data.edgeKey,
       objectName: isNode ? (data.objectName || data.nodeName) : data.edgeName,
+      relationType: isNode ? '' : data.relationType,
+      sourceObjectType: source ? source.objectType : data.sourceObjectType,
+      targetObjectType: target ? target.objectType : data.targetObjectType,
     };
   }
 
@@ -534,8 +614,8 @@ export default function DataTopologyPage() {
     }
     const rect = svg.getBoundingClientRect();
     return {
-      x: ((event.clientX - rect.left) / rect.width) * 1200,
-      y: ((event.clientY - rect.top) / rect.height) * 620,
+      x: canvasViewBox.x + ((event.clientX - rect.left) / rect.width) * canvasViewBox.width,
+      y: canvasViewBox.y + ((event.clientY - rect.top) / rect.height) * canvasViewBox.height,
     };
   }
 
@@ -550,6 +630,24 @@ export default function DataTopologyPage() {
       setMetricConfigs(data || EMPTY_CONFIG_PAGE);
     } catch (error) {
       showError('指标配置加载失败', error);
+    }
+  }
+
+  async function loadApplicableMetrics(context) {
+    if (!context) return;
+    try {
+      const data = await metricApi.applicable({
+        scopeType: context.topologyElementType === 'EDGE' ? 'TOPOLOGY_EDGE' : 'RESOURCE',
+        objectType: context.objectType,
+        relationType: context.relationType,
+        sourceObjectType: context.sourceObjectType,
+        targetObjectType: context.targetObjectType,
+        enabled: 'true',
+      });
+      setApplicableMetrics(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setApplicableMetrics([]);
+      showError('适用指标加载失败', error);
     }
   }
 
@@ -585,9 +683,39 @@ export default function DataTopologyPage() {
       setMetricDraft(null);
       setToast({ type: 'success', title: '指标配置已保存', message: selectedContext.objectName });
       await loadMetricConfigs(selectedContext);
+      await loadTopologyRuntime();
     } catch (error) {
       showError('指标配置保存失败', error);
     }
+  }
+
+  async function toggleMetricConfig(metric, config, enabled) {
+    if (!selectedContext || !metric) return;
+    try {
+      if (config?.id) {
+        await metricApi.updateResourceConfig(config.id, normalizeTopologyMetricConfig({ ...config, enabled }, selectedContext));
+      } else if (enabled) {
+        const draft = defaultTopologyMetricConfig(selectedContext, [metric], metricImplementations);
+        await metricApi.createResourceConfig(normalizeTopologyMetricConfig({ ...draft, enabled: true }, selectedContext));
+      }
+      setMetricDraft(null);
+      setToast({
+        type: 'success',
+        title: enabled ? '指标已开启' : '指标已关闭',
+        message: metric.metricName || metric.metricCode || selectedContext.objectName,
+      });
+      await loadMetricConfigs(selectedContext);
+      await loadTopologyRuntime();
+    } catch (error) {
+      showError(enabled ? '指标开启失败' : '指标关闭失败', error);
+    }
+  }
+
+  function startMetricConfig(nextMetrics = applicableMetrics) {
+    if (!selectedContext) return;
+    if (!nextMetrics.length) return;
+    setInspectorTab('metrics');
+    setMetricDraft(defaultTopologyMetricConfig(selectedContext, nextMetrics, metricImplementations));
   }
 
   async function saveThresholdRule(form) {
@@ -610,6 +738,7 @@ export default function DataTopologyPage() {
       setThresholdDraft(null);
       setToast({ type: 'success', title: '阈值规则已保存', message: selectedContext.objectName });
       await loadThresholdRules(selectedContext);
+      await loadTopologyRuntime();
     } catch (error) {
       showError('阈值规则保存失败', error);
     }
@@ -623,6 +752,7 @@ export default function DataTopologyPage() {
       setEdges((response.edges || []).map(normalizeEdge));
       setSelected(null);
       setToast({ type: 'success', title: '拓扑画布已保存', message: current.topologyName });
+      await loadTopologyRuntime(current, (response.nodes || []).map(normalizeNode), (response.edges || []).map(normalizeEdge));
     } catch (error) {
       showError('画布保存失败', error);
     }
@@ -680,7 +810,7 @@ export default function DataTopologyPage() {
 
   if (mode === 'canvas') {
     return (
-      <div className="fp-page fp-topology-page fp-topology-editor-page">
+      <div className={`fp-page fp-topology-page fp-topology-editor-page ${canvasFullscreen ? 'is-canvas-fullscreen' : ''}`}>
         <header className="fp-topology-canvas-header">
           <button className="fp-link-button fp-back-link" type="button" onClick={backToList}>返回拓扑列表</button>
           <div className="fp-topology-canvas-title">
@@ -691,6 +821,8 @@ export default function DataTopologyPage() {
           <div className="fp-actions">
             <button className="fp-button" type="button" onClick={openEdit} disabled={!current}>编辑信息</button>
             <button className="fp-button" type="button" onClick={deleteSelected} disabled={!selected}>删除元素</button>
+            <button className="fp-button" type="button" onClick={() => setCanvasFullscreen((value) => !value)} disabled={!current}>{canvasFullscreen ? '退出全屏' : '全屏看图'}</button>
+            <button className="fp-button" type="button" onClick={toggleScreenFullscreen} disabled={!current}>{screenFullscreen ? '退出投屏' : '投屏全屏'}</button>
             <button className="fp-button fp-button--primary" type="button" onClick={saveCanvas} disabled={!current}>保存画布</button>
             <button className="fp-button fp-button--danger" type="button" onClick={requestDelete} disabled={!current}>删除拓扑</button>
           </div>
@@ -701,6 +833,16 @@ export default function DataTopologyPage() {
             <div className="fp-topology-canvas-shell">
               {!current ? <EmptyCanvas title="请选择或新增拓扑" desc="拓扑创建后，就可以从右侧资源池添加节点并维护连线。" /> : null}
               {current && nodes.length === 0 ? <EmptyCanvas title="从右侧添加第一个节点" desc="建议先添加 Kafka Topic、Spark 作业、ES Index 等真实资源。" /> : null}
+              <div className="fp-canvas-view-toolbar">
+                <button
+                  className={showCanvasMetrics ? 'is-active' : ''}
+                  type="button"
+                  onClick={() => setShowCanvasMetrics((value) => !value)}
+                >
+                  显示指标
+                </button>
+                <span>{canvasRuntime.alertCount > 0 ? `${canvasRuntime.alertCount} 个告警元素` : '无活动告警'}</span>
+              </div>
               <div className="fp-canvas-controls">
                 <button type="button" onClick={() => zoomCanvas(0.85)}>＋</button>
                 <span>{Math.round((DEFAULT_VIEWBOX.width / canvasViewBox.width) * 100)}%</span>
@@ -718,12 +860,14 @@ export default function DataTopologyPage() {
                 onWheel={handleCanvasWheel}
               >
                 <defs><marker id="fp-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="rgba(138,180,226,.78)" /></marker></defs>
-                {edges.map((edge) => <Edge key={edge.id} edge={edge} nodeMap={nodeMap} selected={selected?.type === 'edge' && selected.data.id === edge.id} onClick={() => { setSelected({ type: 'edge', data: edge }); cancelEdgeDraft(); }} />)}
+                {edges.map((edge) => <Edge key={edge.id} edge={edge} nodeMap={nodeMap} runtime={canvasRuntime.byElementId[edge.id]} showMetrics={showCanvasMetrics} selected={selected?.type === 'edge' && selected.data.id === edge.id} onSelect={(event) => { event.stopPropagation(); setSelected({ type: 'edge', data: edge }); cancelEdgeDraft(); }} />)}
                 {edgeDraft ? <DraftEdge draft={edgeDraft} nodeMap={nodeMap} /> : null}
                 {nodes.map((node) => (
                   <Node
                     key={node.id}
                     node={node}
+                    runtime={canvasRuntime.byElementId[node.id]}
+                    showMetrics={showCanvasMetrics}
                     selected={selected?.type === 'node' && selected.data.id === node.id}
                     linking={edgeDraft && edgeDraft.sourceNodeId === node.id}
                     onMouseDown={(event) => startDrag(event, node)}
@@ -743,14 +887,17 @@ export default function DataTopologyPage() {
                   nodes={nodes}
                   context={selectedContext}
                   activeTab={inspectorTab}
-                  metrics={metricDefinitions}
+                  metrics={applicableMetrics}
                   implementations={metricImplementations}
+                  executorNodes={executorNodes}
                   metricConfigs={metricConfigs}
                   thresholdRules={thresholdRules}
                   metricDraft={metricDraft}
                   thresholdDraft={thresholdDraft}
                   onTabChange={setInspectorTab}
                   onMetricDraft={setMetricDraft}
+                  onStartMetricConfig={startMetricConfig}
+                  onToggleMetric={toggleMetricConfig}
                   onThresholdDraft={setThresholdDraft}
                   onSaveMetric={saveMetricConfig}
                   onSaveThreshold={saveThresholdRule}
@@ -1007,7 +1154,7 @@ function InspectorHeader({ selected, edgeDraft }) {
   if (!selected) {
     return <div className="fp-topology-inspector__head"><span className="fp-kicker">属性面板</span><h2>未选择元素</h2><p>选择节点或连线后在这里修改展示信息。</p></div>;
   }
-  return <div className="fp-topology-inspector__head"><span className="fp-kicker">{selected.type === 'node' ? '节点' : '连线'}</span><h2>{selected.type === 'node' ? selected.data.nodeName : selected.data.edgeName}</h2><p>修改后需要保存画布。</p></div>;
+  return <div className="fp-topology-inspector__head"><span className="fp-kicker">{selected.type === 'node' ? '节点' : '连线'}</span><h2>{selected.type === 'node' ? selected.data.nodeName : selected.data.edgeName}</h2><p>{selected.type === 'node' ? `${nodeTypeText(selected.data.nodeType)} / ${objectTypeText(selected.data.objectType)}` : `${edgeTypeText(selected.data.edgeType)} / ${relationTypeText(selected.data.relationType)}`}</p></div>;
 }
 
 function InspectorEmpty({ edgeDraft }) {
@@ -1023,31 +1170,71 @@ function MiniStat({ stat }) {
   );
 }
 
-function Node({ node, selected, linking, onMouseDown, onContextMenu }) {
+function Node({ node, runtime, showMetrics, selected, linking, onMouseDown, onContextMenu }) {
+  const level = runtime?.level || node.alertLevel || 'NORMAL';
+  const metrics = (runtime?.metrics || []).slice(0, 2);
+  const moreCount = Math.max((runtime?.metrics || []).length - metrics.length, 0);
   return (
-    <g className={`fp-topology-node ${selected ? 'is-selected' : ''} ${linking ? 'is-linking' : ''}`} onMouseDown={onMouseDown} onContextMenu={onContextMenu}>
+    <g className={`fp-topology-node ${selected ? 'is-selected' : ''} ${linking ? 'is-linking' : ''} ${severityClass(level)}`} onMouseDown={onMouseDown} onContextMenu={onContextMenu}>
+      <title>{runtimeTooltip(node.nodeName, runtime)}</title>
       <rect x={node.x} y={node.y} width={node.width} height={node.height} rx="18" />
+      <circle className="fp-topology-status-dot" cx={node.x + node.width - 22} cy={node.y + 22} r="5" />
       <text x={node.x + 18} y={node.y + 36}>{node.nodeName}</text>
-      <text className="fp-node-sub" x={node.x + 18} y={node.y + 67}>{objectTypeText(node.objectType)} / {alertText(node.alertLevel || 'NORMAL')}</text>
+      <text className="fp-node-sub" x={node.x + 18} y={node.y + 62}>{objectTypeText(node.objectType)} / {alertText(level)}</text>
+      {showMetrics ? (
+        <g className="fp-node-metrics">
+          {metrics.map((metric, index) => (
+            <g className={`fp-node-metric ${severityClass(metric.alertLevel || 'NORMAL')}`} key={metric.id || metric.metricCode || index} transform={`translate(${node.x + 14}, ${node.y + node.height + 8 + index * 28})`}>
+              <title>{`${metric.metricName || metric.metricCode}：${metricValueText(metric)} / ${alertText(metric.alertLevel || 'NORMAL')}`}</title>
+              <rect width={node.width - 28} height="24" rx="12" />
+              <text className="fp-node-metric-name" x="10" y="16">{metricNameText(metric)}</text>
+              <text className="fp-node-metric-value" x={node.width - 38} y="16">{metricValueText(metric)}</text>
+            </g>
+          ))}
+          {moreCount > 0 ? (
+            <g className="fp-node-metric-more" transform={`translate(${node.x + node.width - 56}, ${node.y + node.height + 8 + metrics.length * 28})`}>
+              <rect width="42" height="22" rx="11" />
+              <text x="21" y="15">+{moreCount}</text>
+            </g>
+          ) : null}
+        </g>
+      ) : null}
     </g>
   );
 }
 
-function Edge({ edge, nodeMap, selected, onClick }) {
+function Edge({ edge, nodeMap, runtime, showMetrics, selected, onSelect }) {
   const source = nodeMap[edge.sourceNodeId];
   const target = nodeMap[edge.targetNodeId];
   if (!source || !target) return null;
+  const level = runtime?.level || edge.alertLevel || 'NORMAL';
   const x1 = source.x + source.width;
   const y1 = source.y + source.height / 2;
   const x2 = target.x;
   const y2 = target.y + target.height / 2;
   const mid = (x1 + x2) / 2;
   const path = `M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}`;
+  const label = edge.edgeName || edge.edgeKey || '连线';
+  const labelWidth = clamp(label.length * 13 + 28, 72, 180);
+  const labelY = (y1 + y2) / 2 - 8;
+  const metric = (runtime?.metrics || [])[0];
+  const moreCount = Math.max((runtime?.metrics || []).length - 1, 0);
+  const metricLabel = metric ? `${metricNameText(metric)} ${metricValueText(metric)}${moreCount ? ` +${moreCount}` : ''}` : '';
+  const metricWidth = clamp(metricLabel.length * 8 + 28, 120, 240);
   return (
-    <g className={`fp-topology-edge-group ${selected ? 'is-selected' : ''}`} onClick={onClick}>
+    <g className={`fp-topology-edge-group ${selected ? 'is-selected' : ''} ${severityClass(level)}`} onMouseDown={onSelect} onClick={onSelect}>
+      <title>{runtimeTooltip(label, runtime)}</title>
       <path className="fp-topology-edge-hit" d={path} />
       <path className="fp-topology-edge" d={path} />
-      <text className="fp-topology-edge-label" x={mid} y={(y1 + y2) / 2 - 8}>{edge.edgeName}</text>
+      <rect className="fp-topology-edge-label-hit" x={mid - labelWidth / 2} y={labelY - 19} width={labelWidth} height="26" rx="13" />
+      <text className="fp-topology-edge-label" x={mid} y={labelY}>{label}</text>
+      {showMetrics && metric ? (
+        <g className={`fp-topology-edge-metric ${severityClass(metric.alertLevel || 'NORMAL')}`}>
+          <title>{`${metric.metricName || metric.metricCode}：${metricValueText(metric)} / ${alertText(metric.alertLevel || 'NORMAL')}`}</title>
+          <rect x={mid - metricWidth / 2} y={labelY + 7} width={metricWidth} height="22" rx="11" />
+          <text x={mid} y={labelY + 22}>{metricLabel}</text>
+        </g>
+      ) : null}
     </g>
   );
 }
@@ -1067,193 +1254,26 @@ function DraftEdge({ draft, nodeMap }) {
   );
 }
 
-function ElementEditor({
-  selected,
-  nodes,
-  context,
-  activeTab,
-  metrics,
-  implementations,
-  metricConfigs,
-  thresholdRules,
-  metricDraft,
-  thresholdDraft,
-  onTabChange,
-  onMetricDraft,
-  onThresholdDraft,
-  onSaveMetric,
-  onSaveThreshold,
-  onChange,
-}) {
-  return (
-    <div className="fp-topology-editor">
-      <div className="fp-inspector-tabs">
-        <button className={activeTab === 'properties' ? 'is-active' : ''} type="button" onClick={() => onTabChange('properties')}>属性</button>
-        <button className={activeTab === 'metrics' ? 'is-active' : ''} type="button" onClick={() => onTabChange('metrics')}>指标</button>
-        <button className={activeTab === 'thresholds' ? 'is-active' : ''} type="button" onClick={() => onTabChange('thresholds')}>阈值</button>
-        <button className={activeTab === 'alerts' ? 'is-active' : ''} type="button" onClick={() => onTabChange('alerts')}>告警</button>
-      </div>
-      {activeTab === 'properties' ? <TopologyElementProperties selected={selected} nodes={nodes} onChange={onChange} /> : null}
-      {activeTab === 'metrics' ? <TopologyMetricPanel context={context} metrics={metrics} implementations={implementations} metricConfigs={metricConfigs} metricDraft={metricDraft} onMetricDraft={onMetricDraft} onSaveMetric={onSaveMetric} /> : null}
-      {activeTab === 'thresholds' ? <TopologyThresholdPanel context={context} metrics={metrics} metricConfigs={metricConfigs} thresholdRules={thresholdRules} thresholdDraft={thresholdDraft} onThresholdDraft={onThresholdDraft} onSaveThreshold={onSaveThreshold} /> : null}
-      {activeTab === 'alerts' ? <TopologyAlertPanel context={context} /> : null}
-    </div>
-  );
-}
-
-function TopologyAlertPanel({ context }) {
-  return (
-    <div className="fp-topology-config-panel">
-      <div className="fp-topology-config-head">
-        <div>
-          <strong>告警状态</strong>
-          <span>当前元素：{context?.objectName || '-'}</span>
-        </div>
-      </div>
-      <div className="fp-topology-alert-empty">
-        <strong>暂无活动告警</strong>
-        <span>后续这里会展示当前节点或连线的活动告警、最近恢复记录和故障解释。</span>
-      </div>
-    </div>
-  );
-}
-
-function TopologyElementProperties({ selected, nodes, onChange }) {
-  const data = selected.data;
-  if (selected.type === 'node') {
-    return (
-      <div className="fp-topology-property-grid">
-        <label><span>节点名称</span><input value={data.nodeName || ''} onChange={(event) => onChange('nodeName', event.target.value)} /></label>
-        <InfoBox label="节点类型" value={nodeTypeText(data.nodeType)} code={data.nodeType} />
-        <InfoBox label="对象类型" value={objectTypeText(data.objectType)} code={data.objectType} />
-        <label><span>对象编码</span><input value={data.objectCode || ''} disabled /></label>
-      </div>
-    );
-  }
-  return (
-    <div className="fp-topology-property-grid">
-      <label><span>连线名称</span><input value={data.edgeName || ''} onChange={(event) => onChange('edgeName', event.target.value)} /></label>
-      <InfoBox label="连线类型" value={edgeTypeText(data.edgeType)} code={data.edgeType} />
-      <InfoBox label="关系类型" value={relationTypeText(data.relationType)} code={data.relationType} />
-      <label><span>关系 ID</span><input value={data.relationId || ''} onChange={(event) => onChange('relationId', event.target.value)} /></label>
-      <label><span>源节点</span><select value={data.sourceNodeId} onChange={(event) => onChange('sourceNodeId', event.target.value)}>{nodes.map((node) => <option key={node.id} value={node.id}>{node.nodeName}</option>)}</select></label>
-      <label><span>目标节点</span><select value={data.targetNodeId} onChange={(event) => onChange('targetNodeId', event.target.value)}>{nodes.map((node) => <option key={node.id} value={node.id}>{node.nodeName}</option>)}</select></label>
-    </div>
-  );
-}
-
-function InfoBox({ label, value, code }) {
-  return (
-    <div className="fp-topology-info-box">
-      <span>{label}</span>
-      <strong>{value || '-'}</strong>
-      {code && code !== value ? <em>{code}</em> : null}
-    </div>
-  );
-}
-
-function TopologyMetricPanel({ context, metrics, implementations, metricConfigs, metricDraft, onMetricDraft, onSaveMetric }) {
-  const configs = metricConfigs.configs.records || [];
-  const availableMetrics = filterTopologyMetrics(metrics, context);
-  const draft = metricDraft;
-  const selectedMetricId = draft && draft.metricDefinitionId ? draft.metricDefinitionId : '';
-  const availableImplementations = implementations.filter((item) => item.metricDefinitionId === selectedMetricId);
-  return (
-    <div className="fp-topology-config-panel">
-      <div className="fp-topology-config-head">
-        <div><strong>指标配置</strong><span>当前元素：{context?.objectName || '-'}</span></div>
-        <button className="fp-button fp-button--small fp-button--primary" type="button" onClick={() => onMetricDraft(defaultTopologyMetricConfig(context))}>配置指标</button>
-      </div>
-      <div className="fp-topology-config-list">
-        {configs.map((config) => (
-          <button className="fp-topology-config-item" key={config.id} type="button" onClick={() => onMetricDraft(config)}>
-            <strong>{config.metricName || config.metricCode}</strong>
-            <span>{config.implementationName || '默认实现'} · {config.executionMode || '-'} · {config.intervalSec || 60}s</span>
-            <em>{config.enabled === false ? '停用' : '启用'}</em>
-          </button>
-        ))}
-        {configs.length === 0 ? <div className="fp-empty">当前元素还没有配置指标</div> : null}
-      </div>
-      {draft ? (
-        <div className="fp-topology-inline-form">
-          <label><span>指标定义</span><select value={draft.metricDefinitionId || ''} onChange={(event) => onMetricDraft({ ...draft, metricDefinitionId: event.target.value, implementationId: '' })}><option value="">请选择指标</option>{availableMetrics.map((metric) => <option key={metric.id} value={metric.id}>{metric.metricName} / {metric.metricCode}</option>)}</select></label>
-          <label><span>采集实现</span><select value={draft.implementationId || ''} onChange={(event) => onMetricDraft({ ...draft, implementationId: event.target.value })}><option value="">默认实现</option>{availableImplementations.map((impl) => <option key={impl.id} value={impl.id}>{impl.implementationName}</option>)}</select></label>
-          <label><span>执行方式</span><select value={draft.executionMode || 'SERVER'} onChange={(event) => onMetricDraft({ ...draft, executionMode: event.target.value })}><option value="SERVER">SERVER</option><option value="SSH">SSH</option><option value="AGENT">AGENT</option><option value="EXPRESSION">EXPRESSION</option></select></label>
-          <label><span>采集周期</span><input type="number" min="10" value={draft.intervalSec || 60} onChange={(event) => onMetricDraft({ ...draft, intervalSec: Number(event.target.value) })} /></label>
-          <label><span>状态</span><select value={String(draft.enabled !== false)} onChange={(event) => onMetricDraft({ ...draft, enabled: event.target.value === 'true' })}><option value="true">启用</option><option value="false">停用</option></select></label>
-          <label className="is-wide"><span>参数 JSON</span><textarea value={draft.parameterJson || ''} onChange={(event) => onMetricDraft({ ...draft, parameterJson: event.target.value })} placeholder='{"topic":"dw_order","groupId":"order-consumer"}' /></label>
-          <div className="fp-actions"><button className="fp-button" type="button" onClick={() => onMetricDraft(null)}>取消</button><button className="fp-button fp-button--primary" type="button" onClick={() => onSaveMetric(draft)}>保存指标</button></div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function TopologyThresholdPanel({ context, metrics, metricConfigs, thresholdRules, thresholdDraft, onThresholdDraft, onSaveThreshold }) {
-  const configs = metricConfigs.configs.records || [];
-  const metricIndex = indexById(metrics);
-  const thresholdByMetric = {};
-  thresholdRules.forEach((rule) => { thresholdByMetric[rule.metricDefinitionId] = rule; });
-  return (
-    <div className="fp-topology-config-panel">
-      <div className="fp-topology-config-head"><div><strong>阈值配置</strong><span>只能基于已配置指标创建阈值</span></div></div>
-      <div className="fp-topology-config-list">
-        {configs.map((config) => {
-          const metric = metricIndex[config.metricDefinitionId] || config;
-          const rule = thresholdByMetric[config.metricDefinitionId];
-          return (
-            <button className="fp-topology-config-item" key={config.id} type="button" onClick={() => onThresholdDraft(defaultTopologyThresholdRule(context, metric, rule))}>
-              <strong>{metric.metricName || config.metricName || config.metricCode}</strong>
-              <span>{summarizeTopologyThreshold(rule)}</span>
-              <em>{rule ? '已配置' : '未配置'}</em>
-            </button>
-          );
-        })}
-        {configs.length === 0 ? <div className="fp-empty">请先在“指标”页配置指标，再配置阈值。</div> : null}
-      </div>
-      {thresholdDraft ? <TopologyThresholdForm draft={thresholdDraft} onDraft={onThresholdDraft} onCancel={() => onThresholdDraft(null)} onSave={onSaveThreshold} /> : null}
-    </div>
-  );
-}
-
-function TopologyThresholdForm({ draft, onDraft, onCancel, onSave }) {
-  function updateCondition(severity, patch) {
-    onDraft({ ...draft, conditions: draft.conditions.map((item) => (item.severity === severity ? { ...item, ...patch } : item)) });
-  }
-  return (
-    <div className="fp-topology-inline-form">
-      <label className="is-wide"><span>规则名称</span><input value={draft.ruleName || ''} onChange={(event) => onDraft({ ...draft, ruleName: event.target.value })} /></label>
-      <div className="fp-threshold-mini-table">
-        {draft.conditions.map((condition) => (
-          <div className={'fp-threshold-mini-row ' + (condition.enabled ? 'is-enabled' : '')} key={condition.severity}>
-            <label><input type="checkbox" checked={condition.enabled} onChange={(event) => updateCondition(condition.severity, { enabled: event.target.checked })} />{severityText(condition.severity)}</label>
-            <select value={condition.operator} disabled={!condition.enabled} onChange={(event) => updateCondition(condition.severity, { operator: event.target.value })}><option value=">">&gt;</option><option value=">=">&gt;=</option><option value="<">&lt;</option><option value="<=">&lt;=</option><option value="==">=</option><option value="!=">!=</option></select>
-            <input type="number" value={condition.value} disabled={!condition.enabled} onChange={(event) => updateCondition(condition.severity, { value: event.target.value })} />
-          </div>
-        ))}
-      </div>
-      <label><span>判定窗口</span><input type="number" min="10" value={draft.evaluationWindowSec || 60} onChange={(event) => onDraft({ ...draft, evaluationWindowSec: Number(event.target.value) })} /></label>
-      <label><span>连续命中</span><input type="number" min="1" value={draft.consecutiveCount || 1} onChange={(event) => onDraft({ ...draft, consecutiveCount: Number(event.target.value) })} /></label>
-      <div className="fp-actions"><button className="fp-button" type="button" onClick={onCancel}>取消</button><button className="fp-button fp-button--primary" type="button" onClick={() => onSave(draft)}>保存阈值</button></div>
-    </div>
-  );
-}
-
 function edgeDraftText(draft, nodeMap) {
   const source = draft.sourceNodeId ? nodeMap[draft.sourceNodeId]?.nodeName : '未选择源节点';
   const target = draft.targetNodeId ? nodeMap[draft.targetNodeId]?.nodeName : '未选择目标节点';
   return `${source} -> ${target}`;
 }
 
-function defaultTopologyMetricConfig(context) {
+function defaultTopologyMetricConfig(context, metrics = [], implementations = []) {
+  const firstMetric = metrics[0];
+  const firstImplementation = firstMetric
+    ? implementations.find((item) => item.metricDefinitionId === firstMetric.id && item.defaultImplementation)
+      || implementations.find((item) => item.metricDefinitionId === firstMetric.id)
+    : null;
   return {
     objectType: context?.objectType || 'TOPOLOGY_NODE',
     objectId: context?.objectId || '',
     objectCode: context?.objectCode || '',
     objectName: context?.objectName || '',
-    metricDefinitionId: '',
-    implementationId: '',
-    executionMode: 'SERVER',
+    metricDefinitionId: firstMetric?.id || '',
+    implementationId: firstImplementation?.id || '',
+    executionMode: firstImplementation?.executionMode || 'SERVER',
     intervalSec: 60,
     parameterJson: '',
     enabled: true,
@@ -1272,40 +1292,19 @@ function normalizeTopologyMetricConfig(form, context) {
   };
 }
 
-function defaultTopologyThresholdRule(context, metric, rule = null) {
-  const conditions = parseThresholdConditions(rule?.conditionsJson);
-  const conditionMap = {};
-  conditions.forEach((condition) => { conditionMap[condition.severity] = condition; });
-  return {
-    id: rule?.id || '',
-    ruleCode: rule?.ruleCode || `topology_${context.topologyElementType}_${context.topologyElementId}_${metric.id}`.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase(),
-    ruleName: rule?.ruleName || `${context.objectName} - ${metric.metricName || metric.metricCode}`,
-    metricDefinitionId: metric.id || metric.metricDefinitionId,
-    evaluationWindowSec: rule?.evaluationWindowSec || 60,
-    consecutiveCount: rule?.consecutiveCount || 1,
-    recoveryPolicy: rule?.recoveryPolicy || 'AUTO',
-    enabled: rule ? rule.enabled !== false : true,
-    description: rule?.description || '',
-    conditions: QUICK_THRESHOLD_SEVERITIES.map(([severity]) => {
-      const condition = conditionMap[severity] || {};
-      return {
-        severity,
-        enabled: Boolean(conditionMap[severity]),
-        operator: condition.operator || '>=',
-        value: condition.value !== undefined && condition.value !== null ? String(condition.value) : '',
-      };
-    }),
-  };
-}
-
 function normalizeTopologyThresholdRule(form, context, metrics) {
   const metric = metrics.find((item) => item.id === form.metricDefinitionId) || {};
   const conditions = (form.conditions || [])
     .filter((condition) => condition.enabled && condition.value !== '')
-    .map((condition) => ({ severity: condition.severity, operator: condition.operator || '>=', value: Number(condition.value) }))
+    .map((condition) => ({
+      severity: condition.severity,
+      enabled: true,
+      operator: condition.operator || '>=',
+      value: Number(condition.value),
+    }))
     .filter((condition) => Number.isFinite(condition.value));
   return {
-    ruleCode: form.ruleCode,
+    ruleCode: form.ruleCode || buildTopologyThresholdRuleCode(context, metric, form),
     ruleName: form.ruleName || `${context.objectName} - ${metric.metricName || form.metricDefinitionId}`,
     metricDefinitionId: form.metricDefinitionId,
     scopeType: 'TOPOLOGY_ELEMENT',
@@ -1325,41 +1324,49 @@ function normalizeTopologyThresholdRule(form, context, metrics) {
   };
 }
 
+function buildTopologyThresholdRuleCode(context, metric, form) {
+  const parts = [
+    'topology',
+    context?.topologyId,
+    context?.topologyElementId,
+    metric?.metricCode || form.metricDefinitionId,
+  ];
+  return parts
+    .filter(Boolean)
+    .join('_')
+    .replace(/[^a-zA-Z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .slice(0, 128);
+}
+
 function filterTopologyMetrics(metrics, context) {
   if (!context) return [];
   const topologyType = context.topologyElementType === 'EDGE' ? 'TOPOLOGY_EDGE' : 'TOPOLOGY_NODE';
+  const compatibleTypes = compatibleMetricObjectTypes(context.objectType, topologyType);
   return metrics.filter((metric) => {
     if (metric.enabled === false) return false;
-    return !metric.objectType || metric.objectType === context.objectType || metric.objectType === topologyType || metric.metricCategory === topologyType;
+    return !metric.objectType
+      || compatibleTypes.has(metric.objectType)
+      || metric.metricCategory === topologyType
+      || metric.metricCategory === 'DERIVED';
   });
 }
 
-function parseThresholdConditions(value) {
-  try {
-    const parsed = JSON.parse(value || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
-  }
-}
-
-function summarizeTopologyThreshold(rule) {
-  if (!rule) return '未配置阈值';
-  const conditions = parseThresholdConditions(rule.conditionsJson);
-  if (!conditions.length) return rule.enabled === false ? '已停用' : '已配置';
-  const text = conditions.slice(0, 3).map((item) => `${severityText(item.severity)} ${item.operator || ''} ${item.value ?? '-'}`).join(' / ');
-  return rule.enabled === false ? `${text}（停用）` : text;
-}
-
-function severityText(value) {
-  const map = {
-    REMIND: '提醒',
-    WARNING: '警告',
-    ERROR: '错误',
-    CRITICAL: '紧急',
-    URGENT: '紧急',
+function compatibleMetricObjectTypes(objectType, topologyType) {
+  const values = new Set([objectType, topologyType]);
+  const groups = {
+    KAFKA_TOPIC: ['KAFKA', 'KAFKA_TOPIC', 'RESOURCE', 'TOPOLOGY_NODE'],
+    KAFKA_GROUP: ['KAFKA', 'KAFKA_GROUP', 'RESOURCE', 'TOPOLOGY_NODE'],
+    SPARK_JOB: ['SPARK', 'SPARK_JOB', 'RESOURCE', 'TOPOLOGY_NODE'],
+    SPARK_LOGICAL_JOB: ['SPARK', 'SPARK_JOB', 'SPARK_LOGICAL_JOB', 'LOGICAL_OBJECT', 'RESOURCE', 'TOPOLOGY_NODE'],
+    ES_INDEX: ['ELASTICSEARCH', 'ES_INDEX', 'RESOURCE', 'TOPOLOGY_NODE'],
+    ES_LOGICAL_INDEX: ['ELASTICSEARCH', 'ES_INDEX', 'ES_LOGICAL_INDEX', 'LOGICAL_OBJECT', 'RESOURCE', 'TOPOLOGY_NODE'],
+    ELASTICSEARCH: ['ELASTICSEARCH', 'ES_INDEX', 'RESOURCE', 'TOPOLOGY_NODE'],
+    APPLICATION: ['APPLICATION', 'RESOURCE', 'TOPOLOGY_NODE'],
+    TOPOLOGY_EDGE: ['TOPOLOGY_EDGE', 'DERIVED'],
   };
-  return map[value] || value;
+  (groups[objectType] || []).forEach((item) => values.add(item));
+  return values;
 }
 
 function nodeTypeText(value) {
@@ -1439,10 +1446,163 @@ function normalizeEdge(edge) {
   };
 }
 
+function buildCanvasRuntime(nodes, edges, configs, alerts, metricDefinitionMap) {
+  const byElementId = {};
+  nodes.forEach((node) => {
+    const key = runtimeKey(node.objectType, node.objectId);
+    byElementId[node.id] = {
+      elementId: node.id,
+      level: 'NORMAL',
+      metrics: metricDisplayItems(configs.filter((config) => runtimeKey(config.objectType, config.objectId) === key), metricDefinitionMap),
+      alerts: [],
+    };
+  });
+  edges.forEach((edge) => {
+    const key = runtimeKey('TOPOLOGY_EDGE', edge.id);
+    byElementId[edge.id] = {
+      elementId: edge.id,
+      level: 'NORMAL',
+      metrics: metricDisplayItems(configs.filter((config) => runtimeKey(config.objectType, config.objectId) === key), metricDefinitionMap),
+      alerts: [],
+    };
+  });
+  alerts.forEach((alert) => {
+    const elementId = alert.topologyElementId || alert.objectId;
+    if (!elementId) return;
+    if (!byElementId[elementId]) {
+      byElementId[elementId] = { elementId, level: 'NORMAL', metrics: [], alerts: [] };
+    }
+    byElementId[elementId].alerts.push(alert);
+    byElementId[elementId].level = highestSeverity([byElementId[elementId].level, alert.currentLevel]);
+  });
+  Object.values(byElementId).forEach((runtime) => {
+    const alertByMetric = {};
+    runtime.alerts.forEach((alert) => {
+      if (!alert.metricDefinitionId) return;
+      alertByMetric[alert.metricDefinitionId] = highestSeverity([alertByMetric[alert.metricDefinitionId] || 'NORMAL', alert.currentLevel]);
+    });
+    runtime.metrics = runtime.metrics
+      .map((metric) => ({ ...metric, alertLevel: alertByMetric[metric.metricDefinitionId] || 'NORMAL' }))
+      .sort((left, right) => {
+        const levelDiff = severityRank(right.alertLevel) - severityRank(left.alertLevel);
+        if (levelDiff !== 0) return levelDiff;
+        const leftTime = Number(left.currentValueAt || left.lastCollectAt || 0);
+        const rightTime = Number(right.currentValueAt || right.lastCollectAt || 0);
+        return rightTime - leftTime;
+      });
+  });
+  return {
+    byElementId,
+    alertCount: Object.values(byElementId).filter((item) => severityRank(item.level) > severityRank('NORMAL')).length,
+  };
+}
+
+function topologyElementRuntimeKeys(nodes, edges) {
+  const keys = new Set();
+  nodes.forEach((node) => keys.add(runtimeKey(node.objectType, node.objectId)));
+  edges.forEach((edge) => keys.add(runtimeKey('TOPOLOGY_EDGE', edge.id)));
+  return keys;
+}
+
+function runtimeKey(objectType, objectId) {
+  return `${objectType || ''}::${objectId || ''}`;
+}
+
+function metricDisplayItems(configs, metricDefinitionMap) {
+  return configs
+    .filter((config) => config.enabled !== false)
+    .map((config) => {
+      const metric = metricDefinitionMap[config.metricDefinitionId] || {};
+      return {
+        ...config,
+        unit: metric.valueUnit || config.valueUnit || '',
+        precision: Number.isFinite(Number(metric.valuePrecision)) ? Number(metric.valuePrecision) : 2,
+      };
+    })
+    .sort((left, right) => Number(right.currentValueAt || right.lastCollectAt || 0) - Number(left.currentValueAt || left.lastCollectAt || 0));
+}
+
+function metricShortText(metric) {
+  return `${metricNameText(metric)} ${metricValueText(metric)}`;
+}
+
+function metricNameText(metric) {
+  const name = metric.metricName || metric.metricCode || '指标';
+  return compactMetricName(name);
+}
+
+function compactMetricName(name) {
+  const normalized = String(name || '指标')
+    .replace(/^Kafka\s*/i, '')
+    .replace(/^Spark\s*/i, '')
+    .replace(/^ES\s*/i, '')
+    .replace(/\s+/g, '');
+  return normalized.length > 7 ? `${normalized.slice(0, 7)}…` : normalized;
+}
+
+function metricValueText(metric) {
+  const value = metric.currentValue === null || metric.currentValue === undefined ? '-' : formatMetricValue(metric.currentValue, metric.precision);
+  return `${value}${metric.unit || ''}`;
+}
+
+function formatMetricValue(value, precision = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '-';
+  if (Math.abs(number) >= 1000) return number.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+  return number.toLocaleString('zh-CN', { maximumFractionDigits: Math.min(Math.max(precision, 0), 4) });
+}
+
+function runtimeTooltip(title, runtime) {
+  const level = alertText(runtime?.level || 'NORMAL');
+  const alerts = runtime?.alerts || [];
+  const metrics = runtime?.metrics || [];
+  const lines = [`${title} / ${level}`];
+  alerts.slice(0, 3).forEach((alert) => lines.push(`告警：${alert.message || alert.currentLevel}`));
+  metrics.slice(0, 4).forEach((metric) => lines.push(`指标：${metric.metricName || metric.metricCode} = ${formatMetricValue(metric.currentValue, metric.precision)}${metric.unit || ''}`));
+  return lines.join('\n');
+}
+
+function highestSeverity(levels) {
+  return levels.reduce((highest, level) => (severityRank(level) > severityRank(highest) ? level : highest), 'NORMAL');
+}
+
+function severityRank(level) {
+  const map = { NORMAL: 0, UNKNOWN: 1, INFO: 2, REMIND: 2, WARNING: 3, ERROR: 4, CRITICAL: 5 };
+  return map[level] ?? 1;
+}
+
+function severityClass(level) {
+  const normalized = level === 'REMIND' ? 'INFO' : (level || 'NORMAL');
+  return `is-alert-${String(normalized).toLowerCase()}`;
+}
+
 function indexById(items) {
   const map = {};
   items.forEach((item) => { map[item.id] = item; });
   return map;
+}
+
+function parseJsonObject(value) {
+  try {
+    const parsed = JSON.parse(value || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function stringifyParameter(value) {
+  return JSON.stringify(value || {}, null, 2);
+}
+
+function labelExecutionMode(value) {
+  const map = {
+    SERVER: '服务端',
+    SSH: 'SSH',
+    AGENT: 'Agent',
+    EXPRESSION: '表达式',
+  };
+  return map[value] || value || '-';
 }
 
 function nextId() {
@@ -1474,6 +1634,7 @@ function alertText(level) {
   const map = {
     NORMAL: '正常',
     INFO: '提醒',
+    REMIND: '提醒',
     WARNING: '警告',
     ERROR: '错误',
     CRITICAL: '紧急',

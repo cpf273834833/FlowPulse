@@ -6,10 +6,12 @@ import com.flowpulse.metric.domain.model.ResourceMetricConfigEntity;
 public class MetricCollectContext {
     private final ResourceMetricConfigEntity config;
     private final MetricImplementationEntity implementation;
+    private final String resolvedParameterJson;
 
-    public MetricCollectContext(ResourceMetricConfigEntity config, MetricImplementationEntity implementation) {
+    public MetricCollectContext(ResourceMetricConfigEntity config, MetricImplementationEntity implementation, String resolvedParameterJson) {
         this.config = config;
         this.implementation = implementation;
+        this.resolvedParameterJson = resolvedParameterJson;
     }
 
     public ResourceMetricConfigEntity getConfig() {
@@ -18,5 +20,9 @@ public class MetricCollectContext {
 
     public MetricImplementationEntity getImplementation() {
         return implementation;
+    }
+
+    public String getResolvedParameterJson() {
+        return resolvedParameterJson;
     }
 }

@@ -353,7 +353,6 @@ const zhCN = {
   'metric.mappingMissingDesc': '\u5982\u679c\u8fd9\u662f\u72b6\u6001\u7c7b\u6307\u6807\uff0c\u5efa\u8bae\u5148\u914d\u7f6e\u72b6\u6001\u6620\u5c04\u3002',
   'metric.relatedImplementations': '\u5173\u8054\u91c7\u96c6\u5b9e\u73b0',
   'metric.implementationConfig': '\u5b9e\u73b0\u914d\u7f6e',
-  'metric.configJson': '\u914d\u7f6e\u53c2\u6570',
   'metric.noMetricSelected': '\u8bf7\u5148\u9009\u62e9\u4e00\u4e2a\u6307\u6807',
   'metric.noImplementationSelected': '\u8bf7\u5148\u9009\u62e9\u4e00\u4e2a\u91c7\u96c6\u5b9e\u73b0',
   'metric.noImplementation': '\u6682\u65e0\u91c7\u96c6\u5b9e\u73b0',

@@ -377,56 +377,47 @@ export default function EnvironmentRegionPage() {
                             onConfig={() => openRegionConfigForm(management, 'OMP')}
                           />
                         </div>
-                        {computes.length > 0 ? <p className="fp-management-card__hint">{t('subordinateCompute')} {computes.length} {t('unit')}</p> : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <section className="fp-region-section">
-                <div className="fp-region-section__head">
-                  <h4>{t('computeRegion')}({selectedComputeRegions.length})</h4>
-                  <button className="fp-button" type="button" onClick={() => openRegionForm('COMPUTE', selectedEnvironment.id, selectedManagementRegions[0] && selectedManagementRegions[0].id)}>
-                    <PlusOutlined />
-                    {t('addComputeRegion')}
-                  </button>
-                </div>
-                <div className="fp-compute-table">
-                  <div className="fp-compute-table__row fp-compute-table__row--head">
-                    <span>{t('computeRegion')}</span>
-                    <span>{t('code')}</span>
-                    <span>{t('platform')}</span>
-                    <span>{t('omp')}</span>
-                    <span>{t('operation')}</span>
-                  </div>
-                  {selectedComputeRegions.length === 0 ? <div className="fp-empty fp-empty--small">{t('noCompute')}</div> : null}
-                  {selectedComputeRegions.map((compute) => {
-                    const computeConfig = configIndex[compute.id];
-                    return (
-                      <div className="fp-compute-table__row" key={compute.id}>
-                        <strong>{compute.regionName}</strong>
-                        <span>{compute.regionCode}</span>
-                        <ConfigState configured={hasPlatformConfig(computeConfig)} />
-                        <ConfigState configured={hasOmpConfig(computeConfig)} />
-                        <span className="fp-actions fp-actions--wrap">
-                          <button className="fp-link-button" type="button" onClick={() => openRegionConfigForm(compute, 'PLATFORM')}>
-                            <ApiOutlined />
-                            {t('platformConfig')}
-                          </button>
-                          <button className="fp-link-button" type="button" onClick={() => openRegionConfigForm(compute, 'OMP')}>
-                            <CloudServerOutlined />
-                            {t('ompConfig')}
-                          </button>
-                          <button className="fp-link-button" type="button" onClick={() => openRegionForm('COMPUTE', selectedEnvironment.id, compute.parentRegionId, compute)}>
-                            <EditOutlined />
-                            {t('edit')}
-                          </button>
-                          <button className="fp-link-button fp-link-button--danger" type="button" onClick={() => requestDelete('region', compute)}>
-                            <DeleteOutlined />
-                            {t('delete')}
-                          </button>
-                        </span>
+                        <div className="fp-compute-children">
+                          <div className="fp-compute-children__head">
+                            <span>{t('subordinateCompute')} {computes.length} {t('unit')}</span>
+                            <button className="fp-link-button" type="button" onClick={() => openRegionForm('COMPUTE', selectedEnvironment.id, management.id)}>
+                              <PlusOutlined />
+                              {t('addComputeRegion')}
+                            </button>
+                          </div>
+                          {computes.length === 0 ? <div className="fp-empty fp-empty--small">{t('noCompute')}</div> : null}
+                          {computes.map((compute) => {
+                            const computeConfig = configIndex[compute.id];
+                            return (
+                              <div className="fp-compute-child" key={compute.id}>
+                                <div className="fp-compute-child__main">
+                                  <strong>{compute.regionName}</strong>
+                                  <em>{compute.regionCode}</em>
+                                </div>
+                                <ConfigState configured={hasPlatformConfig(computeConfig)} />
+                                <ConfigState configured={hasOmpConfig(computeConfig)} />
+                                <span className="fp-actions fp-actions--wrap">
+                                  <button className="fp-link-button" type="button" onClick={() => openRegionConfigForm(compute, 'PLATFORM')}>
+                                    <ApiOutlined />
+                                    {t('platformConfig')}
+                                  </button>
+                                  <button className="fp-link-button" type="button" onClick={() => openRegionConfigForm(compute, 'OMP')}>
+                                    <CloudServerOutlined />
+                                    {t('ompConfig')}
+                                  </button>
+                                  <button className="fp-link-button" type="button" onClick={() => openRegionForm('COMPUTE', selectedEnvironment.id, compute.parentRegionId, compute)}>
+                                    <EditOutlined />
+                                    {t('edit')}
+                                  </button>
+                                  <button className="fp-link-button fp-link-button--danger" type="button" onClick={() => requestDelete('region', compute)}>
+                                    <DeleteOutlined />
+                                    {t('delete')}
+                                  </button>
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   })}

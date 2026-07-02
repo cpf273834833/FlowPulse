@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.flowpulse.metric.infrastructure.persistence.mapper.MetricApplicabilityMapper">
+    <resultMap id="MetricApplicabilityMap" type="com.flowpulse.metric.domain.model.MetricApplicabilityEntity">
+        <id property="id" column="id"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="metricDefinitionId" column="metric_definition_id"/>
+        <result property="scopeType" column="scope_type"/>
+        <result property="objectType" column="object_type"/>
+        <result property="relationType" column="relation_type"/>
+        <result property="sourceObjectType" column="source_object_type"/>
+        <result property="targetObjectType" column="target_object_type"/>
+        <result property="collectAnchor" column="collect_anchor"/>
+        <result property="requiredParamsJson" column="required_params_json"/>
+        <result property="enabled" column="enabled"/>
+        <result property="description" column="description"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectByMetricIds" resultMap="MetricApplicabilityMap">
+        select * from fp_metric_applicability
+        where tenant_id = #{tenantId}
+        <choose>
+            <when test="metricIds != null and metricIds.size() > 0">
+                and metric_definition_id in
+                <foreach collection="metricIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </when>
+            <otherwise>
+                and 1 = 0
+            </otherwise>
+        </choose>
+        order by created_at asc
+    </select>
+
+    <select id="selectApplicableMetrics" resultMap="com.flowpulse.metric.infrastructure.persistence.mapper.MetricDefinitionMapper.MetricDefinitionMap">
+        select distinct d.*,
+               (select count(1) from fp_metric_implementation i where i.tenant_id = d.tenant_id and i.metric_definition_id = d.id) as implementation_count
+        from fp_metric_definition d
+        left join fp_metric_applicability a on a.tenant_id = d.tenant_id and a.metric_definition_id = d.id
+        where d.tenant_id = #{tenantId}
+          <if test="enabled != null">and d.enabled = #{enabled}</if>
+          and (
+            (
+              a.id is not null
+              and a.enabled = true
+              and a.scope_type = #{scopeType}
+              <if test="objectType != null and objectType != ''">and (a.object_type is null or a.object_type = '' or a.object_type = #{objectType})</if>
+              <if test="relationType != null and relationType != ''">and (a.relation_type is null or a.relation_type = '' or a.relation_type = #{relationType})</if>
+              <if test="sourceObjectType != null and sourceObjectType != ''">and (a.source_object_type is null or a.source_object_type = '' or a.source_object_type = #{sourceObjectType})</if>
+              <if test="targetObjectType != null and targetObjectType != ''">and (a.target_object_type is null or a.target_object_type = '' or a.target_object_type = #{targetObjectType})</if>
+            )
+            or (
+              not exists (
+                select 1 from fp_metric_applicability fallback
+                where fallback.tenant_id = d.tenant_id and fallback.metric_definition_id = d.id
+              )
+              and d.metric_category = #{scopeType}
+              <if test="objectType != null and objectType != ''">and d.object_type = #{objectType}</if>
+            )
+          )
+        order by d.metric_name asc, d.metric_code asc
+    </select>
+
+    <insert id="insert" parameterType="com.flowpulse.metric.domain.model.MetricApplicabilityEntity">
+        insert into fp_metric_applicability
+        (id, tenant_id, metric_definition_id, scope_type, object_type, relation_type, source_object_type,
+         target_object_type, collect_anchor, required_params_json, enabled, description, created_at, updated_at)
+        values
+        (#{id}, #{tenantId}, #{metricDefinitionId}, #{scopeType}, #{objectType}, #{relationType}, #{sourceObjectType},
+         #{targetObjectType}, #{collectAnchor}, #{requiredParamsJson}, #{enabled}, #{description}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <delete id="deleteByMetricDefinitionId">
+        delete from fp_metric_applicability
+        where tenant_id = #{tenantId} and metric_definition_id = #{metricDefinitionId}
+    </delete>
+</mapper>

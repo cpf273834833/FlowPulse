@@ -49,7 +49,7 @@ public class SshScriptMetricCollector extends AbstractScriptMetricCollector {
         session.setConfig(configProperties);
         session.connect(timeoutSeconds(implementation) * 1000);
         try {
-            String command = remoteCommand(implementation, config, node);
+            String command = remoteCommand(context, node);
             ChannelExec channel = (ChannelExec) session.openChannel("exec");
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             ByteArrayOutputStream error = new ByteArrayOutputStream();
@@ -71,14 +71,15 @@ public class SshScriptMetricCollector extends AbstractScriptMetricCollector {
         }
     }
 
-    private String remoteCommand(MetricImplementationEntity implementation, ResourceMetricConfigEntity config, ExecutorNodeEntity node) {
+    private String remoteCommand(MetricCollectContext context, ExecutorNodeEntity node) {
+        MetricImplementationEntity implementation = context.getImplementation();
         String script = scriptContent(implementation);
-        String prefix = "export FP_TENANT_ID=" + shellQuote(config.getTenantId())
-                + " FP_OBJECT_TYPE=" + shellQuote(config.getObjectType())
-                + " FP_OBJECT_ID=" + shellQuote(config.getObjectId())
-                + " FP_OBJECT_CODE=" + shellQuote(config.getObjectCode())
-                + " FP_OBJECT_NAME=" + shellQuote(config.getObjectName())
-                + " FP_PARAMETER_JSON=" + shellQuote(config.getParameterJson()) + "; ";
+        String prefix = "export FP_TENANT_ID=" + shellQuote(envValue(context, "FP_TENANT_ID"))
+                + " FP_OBJECT_TYPE=" + shellQuote(envValue(context, "FP_OBJECT_TYPE"))
+                + " FP_OBJECT_ID=" + shellQuote(envValue(context, "FP_OBJECT_ID"))
+                + " FP_OBJECT_CODE=" + shellQuote(envValue(context, "FP_OBJECT_CODE"))
+                + " FP_OBJECT_NAME=" + shellQuote(envValue(context, "FP_OBJECT_NAME"))
+                + " FP_PARAMETER_JSON=" + shellQuote(envValue(context, "FP_PARAMETER_JSON")) + "; ";
         if ("PYTHON".equalsIgnoreCase(implementation.getImplementationType())) {
             String python = notBlank(node.getPythonPath()) ? node.getPythonPath() : "python";
             return prefix + python + " - <<'FLOWPULSE_PY'\n" + script + "\nFLOWPULSE_PY";

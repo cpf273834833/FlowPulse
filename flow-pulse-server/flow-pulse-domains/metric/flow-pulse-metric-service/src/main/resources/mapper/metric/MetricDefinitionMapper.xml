@@ -11,7 +11,13 @@
         <result property="objectType" column="object_type"/>
         <result property="valueUnit" column="value_unit"/>
         <result property="valuePrecision" column="value_precision"/>
+        <result property="metricKind" column="metric_kind"/>
+        <result property="instanceDimension" column="instance_dimension"/>
+        <result property="sourceMetricCode" column="source_metric_code"/>
+        <result property="deriveType" column="derive_type"/>
+        <result property="parameterSchemaJson" column="parameter_schema_json"/>
         <result property="mappingJson" column="mapping_json"/>
+        <result property="systemBuiltin" column="system_builtin"/>
         <result property="enabled" column="enabled"/>
         <result property="implementationCount" column="implementation_count"/>
         <result property="description" column="description"/>
@@ -76,17 +82,23 @@
     <insert id="insert" parameterType="com.flowpulse.metric.domain.model.MetricDefinitionEntity">
         insert into fp_metric_definition
         (id, tenant_id, metric_code, metric_name, metric_category, object_type,
-         value_unit, value_precision, mapping_json, enabled, description, created_at, updated_at)
+         value_unit, value_precision, metric_kind, instance_dimension, source_metric_code, derive_type,
+         parameter_schema_json, mapping_json, system_builtin, enabled, description, created_at, updated_at)
         values
         (#{id}, #{tenantId}, #{metricCode}, #{metricName}, #{metricCategory}, #{objectType},
-         #{valueUnit}, #{valuePrecision}, #{mappingJson}, #{enabled}, #{description}, #{createdAt}, #{updatedAt})
+         #{valueUnit}, #{valuePrecision}, #{metricKind}, #{instanceDimension}, #{sourceMetricCode}, #{deriveType},
+         #{parameterSchemaJson}, #{mappingJson}, #{systemBuiltin}, #{enabled}, #{description}, #{createdAt}, #{updatedAt})
     </insert>
 
     <update id="update" parameterType="com.flowpulse.metric.domain.model.MetricDefinitionEntity">
         update fp_metric_definition
         set metric_code = #{metricCode}, metric_name = #{metricName}, metric_category = #{metricCategory},
             object_type = #{objectType}, value_unit = #{valueUnit}, value_precision = #{valuePrecision},
-            mapping_json = #{mappingJson}, enabled = #{enabled}, description = #{description}, updated_at = #{updatedAt}
+            metric_kind = #{metricKind}, instance_dimension = #{instanceDimension},
+            source_metric_code = #{sourceMetricCode}, derive_type = #{deriveType},
+            parameter_schema_json = #{parameterSchemaJson}, mapping_json = #{mappingJson},
+            system_builtin = #{systemBuiltin},
+            enabled = #{enabled}, description = #{description}, updated_at = #{updatedAt}
         where tenant_id = #{tenantId} and id = #{id}
     </update>
 

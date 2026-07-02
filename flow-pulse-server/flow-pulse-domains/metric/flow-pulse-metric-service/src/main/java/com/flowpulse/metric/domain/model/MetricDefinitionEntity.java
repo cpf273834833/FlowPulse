@@ -9,7 +9,13 @@ public class MetricDefinitionEntity {
     private String objectType;
     private String valueUnit;
     private Integer valuePrecision;
+    private String metricKind;
+    private String instanceDimension;
+    private String sourceMetricCode;
+    private String deriveType;
+    private String parameterSchemaJson;
     private String mappingJson;
+    private Boolean systemBuiltin;
     private Boolean enabled;
     private Long implementationCount;
     private String description;
@@ -32,8 +38,20 @@ public class MetricDefinitionEntity {
     public void setValueUnit(String valueUnit) { this.valueUnit = valueUnit; }
     public Integer getValuePrecision() { return valuePrecision; }
     public void setValuePrecision(Integer valuePrecision) { this.valuePrecision = valuePrecision; }
+    public String getMetricKind() { return metricKind; }
+    public void setMetricKind(String metricKind) { this.metricKind = metricKind; }
+    public String getInstanceDimension() { return instanceDimension; }
+    public void setInstanceDimension(String instanceDimension) { this.instanceDimension = instanceDimension; }
+    public String getSourceMetricCode() { return sourceMetricCode; }
+    public void setSourceMetricCode(String sourceMetricCode) { this.sourceMetricCode = sourceMetricCode; }
+    public String getDeriveType() { return deriveType; }
+    public void setDeriveType(String deriveType) { this.deriveType = deriveType; }
+    public String getParameterSchemaJson() { return parameterSchemaJson; }
+    public void setParameterSchemaJson(String parameterSchemaJson) { this.parameterSchemaJson = parameterSchemaJson; }
     public String getMappingJson() { return mappingJson; }
     public void setMappingJson(String mappingJson) { this.mappingJson = mappingJson; }
+    public Boolean getSystemBuiltin() { return systemBuiltin; }
+    public void setSystemBuiltin(Boolean systemBuiltin) { this.systemBuiltin = systemBuiltin; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     public Long getImplementationCount() { return implementationCount; }

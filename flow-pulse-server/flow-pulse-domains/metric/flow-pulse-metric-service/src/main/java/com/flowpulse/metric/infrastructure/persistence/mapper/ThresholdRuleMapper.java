@@ -34,10 +34,10 @@ public interface ThresholdRuleMapper {
 
     long countScope(@Param("tenantId") String tenantId, @Param("scopeType") String scopeType);
 
-    List<ThresholdRuleEntity> selectEnabledResourceRules(@Param("tenantId") String tenantId,
-                                                         @Param("metricDefinitionId") String metricDefinitionId,
-                                                         @Param("objectType") String objectType,
-                                                         @Param("objectId") String objectId);
+    List<ThresholdRuleEntity> selectEnabledRulesForMetricObject(@Param("tenantId") String tenantId,
+                                                                @Param("metricDefinitionId") String metricDefinitionId,
+                                                                @Param("objectType") String objectType,
+                                                                @Param("objectId") String objectId);
 
     void insert(ThresholdRuleEntity entity);
 

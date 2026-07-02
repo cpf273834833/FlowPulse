@@ -1,6 +1,7 @@
 package com.flowpulse.web.controller;
 
 import com.flowpulse.common.ApiResponse;
+import com.flowpulse.metric.api.request.MetricApplicabilityRequest;
 import com.flowpulse.metric.api.request.MetricDefinitionQueryRequest;
 import com.flowpulse.metric.api.request.MetricDefinitionSaveRequest;
 import com.flowpulse.metric.api.response.MetricDefinitionPageResponse;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.util.List;
 
 @Validated
 @RestController
@@ -36,6 +38,11 @@ public class MetricDefinitionController {
     @GetMapping("/page")
     public ApiResponse<MetricDefinitionPageResponse> page(HttpServletRequest request, MetricDefinitionQueryRequest query) {
         return ApiResponse.success(metricDefinitionService.page(tenantIdResolver.resolve(request), query));
+    }
+
+    @GetMapping("/applicable")
+    public ApiResponse<List<MetricDefinitionResponse>> applicable(HttpServletRequest request, MetricApplicabilityRequest query) {
+        return ApiResponse.success(metricDefinitionService.applicable(tenantIdResolver.resolve(request), query));
     }
 
     @GetMapping("/{id}")

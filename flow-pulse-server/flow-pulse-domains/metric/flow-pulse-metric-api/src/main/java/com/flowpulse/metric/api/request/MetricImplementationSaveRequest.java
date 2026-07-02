@@ -27,7 +27,6 @@ public class MetricImplementationSaveRequest {
     private String scriptLanguage;
 
     private String scriptContent;
-    private String configJson;
     private String parameterSchemaJson;
     private String outputSchemaJson;
     private String builtInCollector;
@@ -54,8 +53,6 @@ public class MetricImplementationSaveRequest {
     public void setScriptLanguage(String scriptLanguage) { this.scriptLanguage = scriptLanguage; }
     public String getScriptContent() { return scriptContent; }
     public void setScriptContent(String scriptContent) { this.scriptContent = scriptContent; }
-    public String getConfigJson() { return configJson; }
-    public void setConfigJson(String configJson) { this.configJson = configJson; }
     public String getParameterSchemaJson() { return parameterSchemaJson; }
     public void setParameterSchemaJson(String parameterSchemaJson) { this.parameterSchemaJson = parameterSchemaJson; }
     public String getOutputSchemaJson() { return outputSchemaJson; }

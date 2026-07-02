@@ -9,6 +9,10 @@
   align-items: start;
 }
 
+.fp-threshold-board--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .fp-threshold-panel {
   min-width: 0;
   padding: 14px;
@@ -97,6 +101,96 @@
   grid-column: 1 / -1;
 }
 
+.fp-threshold-condition-editor {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(91, 148, 214, 0.22);
+  border-radius: 16px;
+  background: rgba(3, 12, 28, 0.42);
+}
+
+.fp-threshold-condition-editor__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fp-threshold-condition-editor__head span {
+  color: #eef8ff;
+  font-weight: 800;
+}
+
+.fp-threshold-condition-editor__head p {
+  margin: 4px 0 0;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+
+.fp-threshold-condition-list {
+  display: grid;
+  gap: 8px;
+}
+
+.fp-threshold-condition-row {
+  display: grid;
+  grid-template-columns: 120px minmax(100px, .8fr) 92px minmax(120px, 1fr) 64px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(104, 158, 220, 0.16);
+  border-radius: 12px;
+  background: rgba(5, 18, 39, 0.56);
+}
+
+.fp-threshold-condition-row select,
+.fp-threshold-condition-row input {
+  height: 36px;
+  min-width: 0;
+  border: 1px solid rgba(104, 158, 220, 0.2);
+  border-radius: 10px;
+  color: var(--fp-text);
+  background: rgba(2, 12, 28, 0.82);
+}
+
+.fp-switch-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fp-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fp-switch-line input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--fp-primary);
+}
+
+.fp-threshold-condition-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.fp-threshold-condition-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 186, 92, 0.24);
+  border-radius: 999px;
+  color: #ffcf7a;
+  background: rgba(255, 186, 92, 0.09);
+}
+
+.fp-threshold-condition-pill strong {
+  color: #fff6df;
+}
+
 @media (max-width: 1280px) {
   .fp-threshold-board {
     grid-template-columns: 1fr;
@@ -110,6 +204,10 @@
 @media (max-width: 920px) {
   .fp-threshold-form,
   .fp-threshold-table .fp-data-table__row {
+    grid-template-columns: 1fr;
+  }
+
+  .fp-threshold-condition-row {
     grid-template-columns: 1fr;
   }
 }

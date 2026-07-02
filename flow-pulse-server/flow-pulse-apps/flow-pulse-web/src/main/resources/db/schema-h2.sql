@@ -212,7 +212,13 @@ create table if not exists fp_metric_definition (
     object_type varchar(64) not null,
     value_unit varchar(32),
     value_precision int not null,
+    metric_kind varchar(32),
+    instance_dimension varchar(64),
+    source_metric_code varchar(128),
+    derive_type varchar(32),
+    parameter_schema_json clob,
     mapping_json clob,
+    system_builtin boolean not null default false,
     enabled boolean not null,
     description varchar(512),
     created_at bigint not null,
@@ -225,9 +231,43 @@ create unique index if not exists uk_fp_metric_definition_code
 drop index if exists idx_fp_metric_definition_page;
 alter table fp_metric_definition drop column if exists metric_source;
 alter table fp_metric_definition drop column if exists collection_method;
+alter table fp_metric_definition drop column if exists default_aggregation;
+alter table fp_metric_definition add column if not exists parameter_schema_json clob;
+alter table fp_metric_definition add column if not exists metric_kind varchar(32);
+alter table fp_metric_definition add column if not exists instance_dimension varchar(64);
+alter table fp_metric_definition add column if not exists source_metric_code varchar(128);
+alter table fp_metric_definition add column if not exists derive_type varchar(32);
+alter table fp_metric_definition add column if not exists system_builtin boolean not null default false;
+update fp_metric_definition set metric_kind = 'RAW' where metric_kind is null or metric_kind = '';
 
 create index if not exists idx_fp_metric_definition_page
     on fp_metric_definition(tenant_id, metric_category, object_type, enabled);
+
+create table if not exists fp_metric_applicability (
+    id varchar(32) not null primary key,
+    tenant_id varchar(32) not null,
+    metric_definition_id varchar(32) not null,
+    scope_type varchar(32) not null,
+    object_type varchar(64),
+    relation_type varchar(64),
+    source_object_type varchar(64),
+    target_object_type varchar(64),
+    collect_anchor varchar(32),
+    required_params_json clob,
+    enabled boolean not null,
+    description varchar(512),
+    created_at bigint not null,
+    updated_at bigint not null
+);
+
+create index if not exists idx_fp_metric_applicability_lookup
+    on fp_metric_applicability(tenant_id, scope_type, object_type, relation_type, source_object_type, target_object_type, enabled);
+
+create index if not exists idx_fp_metric_applicability_metric
+    on fp_metric_applicability(tenant_id, metric_definition_id);
+
+alter table fp_metric_applicability add column if not exists collect_anchor varchar(32);
+alter table fp_metric_applicability add column if not exists required_params_json clob;
 
 create table if not exists fp_metric_implementation (
     id varchar(32) not null primary key,
@@ -239,11 +279,11 @@ create table if not exists fp_metric_implementation (
     execution_mode varchar(32) not null,
     script_language varchar(64),
     script_content clob,
-    config_json clob,
     parameter_schema_json clob,
     output_schema_json clob,
     built_in_collector varchar(128),
     default_implementation boolean not null,
+    system_builtin boolean not null default false,
     enabled boolean not null,
     timeout_sec int not null,
     description varchar(512),
@@ -260,7 +300,12 @@ create index if not exists idx_fp_metric_implementation_page
 create index if not exists idx_fp_metric_implementation_default
     on fp_metric_implementation(tenant_id, metric_definition_id, default_implementation);
 
-alter table fp_metric_implementation add column if not exists config_json clob;
+alter table fp_metric_implementation add column if not exists system_builtin boolean not null default false;
+
+create table if not exists fp_system_migration (
+    migration_key varchar(128) not null primary key,
+    applied_at bigint not null
+);
 
 create table if not exists fp_resource_metric_config (
     id varchar(32) not null primary key,
@@ -275,6 +320,7 @@ create table if not exists fp_resource_metric_config (
     executor_node_id varchar(32),
     interval_sec int not null,
     parameter_json clob,
+    parameter_signature varchar(64) not null default '',
     enabled boolean not null,
     task_status varchar(32) not null,
     last_collect_status varchar(32) not null,
@@ -286,8 +332,14 @@ create table if not exists fp_resource_metric_config (
     updated_at bigint not null
 );
 
+drop index if exists uk_fp_resource_metric_config_object;
+
+alter table fp_resource_metric_config add column if not exists parameter_signature varchar(64) not null default '';
+update fp_resource_metric_config set parameter_signature = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+where parameter_signature is null or parameter_signature = '';
+
 create unique index if not exists uk_fp_resource_metric_config_object
-    on fp_resource_metric_config(tenant_id, object_type, object_id, metric_definition_id);
+    on fp_resource_metric_config(tenant_id, object_type, object_id, metric_definition_id, parameter_signature);
 
 create index if not exists idx_fp_resource_metric_config_page
     on fp_resource_metric_config(tenant_id, object_type, metric_definition_id, enabled);
@@ -304,6 +356,11 @@ create table if not exists fp_metric_sample (
     object_type varchar(64) not null,
     object_id varchar(32) not null,
     object_code varchar(512) not null,
+    infrastructure_type varchar(64),
+    infrastructure_id varchar(32),
+    instance varchar(128),
+    series_type varchar(32),
+    quality varchar(32),
     metric_value double not null,
     collected_at bigint not null,
     metadata_json clob,
@@ -315,6 +372,19 @@ create index if not exists idx_fp_metric_sample_config_time
 
 create index if not exists idx_fp_metric_sample_metric_object
     on fp_metric_sample(tenant_id, metric_definition_id, object_type, object_id, collected_at);
+
+alter table fp_metric_sample add column if not exists infrastructure_type varchar(64);
+alter table fp_metric_sample add column if not exists infrastructure_id varchar(32);
+alter table fp_metric_sample add column if not exists instance varchar(128);
+alter table fp_metric_sample add column if not exists series_type varchar(32);
+alter table fp_metric_sample drop column if exists aggregation;
+alter table fp_metric_sample add column if not exists quality varchar(32);
+update fp_metric_sample set instance = '__TOTAL__' where instance is null or instance = '';
+update fp_metric_sample set series_type = 'AGGREGATE' where series_type is null or series_type = '';
+update fp_metric_sample set quality = 'NORMAL' where quality is null or quality = '';
+
+create index if not exists idx_fp_metric_sample_series_time
+    on fp_metric_sample(tenant_id, metric_code, object_type, object_id, instance, series_type, collected_at);
 
 create table if not exists fp_metric_collect_record (
     id varchar(32) not null primary key,
@@ -546,3 +616,15 @@ create unique index if not exists uk_fp_topology_edge_key
 
 create index if not exists idx_fp_topology_edge_relation
     on fp_topology_edge(tenant_id, relation_type, relation_id);
+
+alter table fp_topology_edge add column if not exists source_object_type varchar(64);
+alter table fp_topology_edge add column if not exists source_object_id varchar(32);
+alter table fp_topology_edge add column if not exists target_object_type varchar(64);
+alter table fp_topology_edge add column if not exists target_object_id varchar(32);
+
+update fp_topology_edge e
+set source_object_type = (select n.object_type from fp_topology_node n where n.tenant_id = e.tenant_id and n.id = e.source_node_id),
+    source_object_id = (select n.object_id from fp_topology_node n where n.tenant_id = e.tenant_id and n.id = e.source_node_id),
+    target_object_type = (select n.object_type from fp_topology_node n where n.tenant_id = e.tenant_id and n.id = e.target_node_id),
+    target_object_id = (select n.object_id from fp_topology_node n where n.tenant_id = e.tenant_id and n.id = e.target_node_id)
+where source_object_type is null or source_object_type = '' or target_object_type is null or target_object_type = '';

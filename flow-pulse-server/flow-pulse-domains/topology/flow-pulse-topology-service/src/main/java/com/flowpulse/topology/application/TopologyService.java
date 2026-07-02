@@ -162,6 +162,10 @@ public class TopologyService {
         entity.setEdgeType(defaultText(request.getEdgeType(), "DATA_FLOW"));
         entity.setSourceNodeId(trim(request.getSourceNodeId()));
         entity.setTargetNodeId(trim(request.getTargetNodeId()));
+        entity.setSourceObjectType(trim(request.getSourceObjectType()));
+        entity.setSourceObjectId(trim(request.getSourceObjectId()));
+        entity.setTargetObjectType(trim(request.getTargetObjectType()));
+        entity.setTargetObjectId(trim(request.getTargetObjectId()));
         entity.setRelationType(defaultText(request.getRelationType(), "MANUAL"));
         entity.setRelationId(trim(request.getRelationId()));
         entity.setPathJson(trim(request.getPathJson()));
@@ -247,6 +251,10 @@ public class TopologyService {
             response.setTargetNodeId(entity.getTargetNodeId());
             response.setRelationType(entity.getRelationType());
             response.setRelationId(entity.getRelationId());
+            response.setSourceObjectType(entity.getSourceObjectType());
+            response.setSourceObjectId(entity.getSourceObjectId());
+            response.setTargetObjectType(entity.getTargetObjectType());
+            response.setTargetObjectId(entity.getTargetObjectId());
             response.setPathJson(entity.getPathJson());
             response.setLabelPositionJson(entity.getLabelPositionJson());
             response.setStyleJson(entity.getStyleJson());
@@ -273,4 +281,5 @@ public class TopologyService {
     private Double defaultDouble(Double value, Double defaultValue) { return value == null ? defaultValue : value; }
     private String defaultText(String value, String defaultValue) { String text = trim(value); return text.length() == 0 ? defaultValue : text; }
     private String trim(String value) { return value == null ? "" : value.trim(); }
+
 }

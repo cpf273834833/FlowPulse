@@ -17,6 +17,9 @@ export const metricApi = {
   page(query) {
     return get(`${BASE}/page${params(query)}`);
   },
+  applicable(query) {
+    return get(`${BASE}/applicable${params(query)}`);
+  },
   detail(id) {
     return get(`${BASE}/${id}`);
   },
@@ -46,6 +49,9 @@ export const metricApi = {
   },
   resourceConfigPage(query) {
     return get(`${BASE}/resource-configs/page${params(query)}`);
+  },
+  resourceConfigLatestSamples(id) {
+    return get(`${BASE}/resource-configs/${id}/samples/latest`);
   },
   createResourceConfig(data) {
     return post(`${BASE}/resource-configs`, data);

@@ -4,6 +4,7 @@ import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Size;
+import java.util.List;
 
 public class MetricDefinitionSaveRequest {
     @NotBlank(message = "{metric.code.required}")
@@ -29,12 +30,28 @@ public class MetricDefinitionSaveRequest {
     @Max(value = 8, message = "{metric.precision.range}")
     private Integer valuePrecision;
 
+    @Size(max = 32, message = "{common.status.size}")
+    private String metricKind;
+
+    @Size(max = 64, message = "{common.status.size}")
+    private String instanceDimension;
+
+    @Size(max = 128, message = "{metric.code.size}")
+    private String sourceMetricCode;
+
+    @Size(max = 32, message = "{common.status.size}")
+    private String deriveType;
+
+    private String parameterSchemaJson;
+
     private String mappingJson;
 
     private Boolean enabled;
 
     @Size(max = 512, message = "{common.description.size}")
     private String description;
+
+    private List<MetricApplicabilitySaveRequest> applicabilityRules;
 
     public String getMetricCode() { return metricCode; }
     public void setMetricCode(String metricCode) { this.metricCode = metricCode; }
@@ -48,10 +65,22 @@ public class MetricDefinitionSaveRequest {
     public void setValueUnit(String valueUnit) { this.valueUnit = valueUnit; }
     public Integer getValuePrecision() { return valuePrecision; }
     public void setValuePrecision(Integer valuePrecision) { this.valuePrecision = valuePrecision; }
+    public String getMetricKind() { return metricKind; }
+    public void setMetricKind(String metricKind) { this.metricKind = metricKind; }
+    public String getInstanceDimension() { return instanceDimension; }
+    public void setInstanceDimension(String instanceDimension) { this.instanceDimension = instanceDimension; }
+    public String getSourceMetricCode() { return sourceMetricCode; }
+    public void setSourceMetricCode(String sourceMetricCode) { this.sourceMetricCode = sourceMetricCode; }
+    public String getDeriveType() { return deriveType; }
+    public void setDeriveType(String deriveType) { this.deriveType = deriveType; }
+    public String getParameterSchemaJson() { return parameterSchemaJson; }
+    public void setParameterSchemaJson(String parameterSchemaJson) { this.parameterSchemaJson = parameterSchemaJson; }
     public String getMappingJson() { return mappingJson; }
     public void setMappingJson(String mappingJson) { this.mappingJson = mappingJson; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public List<MetricApplicabilitySaveRequest> getApplicabilityRules() { return applicabilityRules; }
+    public void setApplicabilityRules(List<MetricApplicabilitySaveRequest> applicabilityRules) { this.applicabilityRules = applicabilityRules; }
 }

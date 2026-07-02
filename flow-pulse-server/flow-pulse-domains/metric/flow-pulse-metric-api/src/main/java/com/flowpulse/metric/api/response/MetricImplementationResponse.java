@@ -11,11 +11,11 @@ public class MetricImplementationResponse {
     private String executionMode;
     private String scriptLanguage;
     private String scriptContent;
-    private String configJson;
     private String parameterSchemaJson;
     private String outputSchemaJson;
     private String builtInCollector;
     private Boolean defaultImplementation;
+    private Boolean systemBuiltin;
     private Boolean enabled;
     private Integer timeoutSec;
     private String description;
@@ -42,8 +42,6 @@ public class MetricImplementationResponse {
     public void setScriptLanguage(String scriptLanguage) { this.scriptLanguage = scriptLanguage; }
     public String getScriptContent() { return scriptContent; }
     public void setScriptContent(String scriptContent) { this.scriptContent = scriptContent; }
-    public String getConfigJson() { return configJson; }
-    public void setConfigJson(String configJson) { this.configJson = configJson; }
     public String getParameterSchemaJson() { return parameterSchemaJson; }
     public void setParameterSchemaJson(String parameterSchemaJson) { this.parameterSchemaJson = parameterSchemaJson; }
     public String getOutputSchemaJson() { return outputSchemaJson; }
@@ -52,6 +50,8 @@ public class MetricImplementationResponse {
     public void setBuiltInCollector(String builtInCollector) { this.builtInCollector = builtInCollector; }
     public Boolean getDefaultImplementation() { return defaultImplementation; }
     public void setDefaultImplementation(Boolean defaultImplementation) { this.defaultImplementation = defaultImplementation; }
+    public Boolean getSystemBuiltin() { return systemBuiltin; }
+    public void setSystemBuiltin(Boolean systemBuiltin) { this.systemBuiltin = systemBuiltin; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     public Integer getTimeoutSec() { return timeoutSec; }

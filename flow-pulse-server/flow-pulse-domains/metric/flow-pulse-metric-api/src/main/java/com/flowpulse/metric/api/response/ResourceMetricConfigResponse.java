@@ -17,6 +17,7 @@ public class ResourceMetricConfigResponse {
     private String executorNodeId;
     private Integer intervalSec;
     private String parameterJson;
+    private String parameterSignature;
     private Boolean enabled;
     private String taskStatus;
     private String lastCollectStatus;
@@ -61,6 +62,8 @@ public class ResourceMetricConfigResponse {
     public void setIntervalSec(Integer intervalSec) { this.intervalSec = intervalSec; }
     public String getParameterJson() { return parameterJson; }
     public void setParameterJson(String parameterJson) { this.parameterJson = parameterJson; }
+    public String getParameterSignature() { return parameterSignature; }
+    public void setParameterSignature(String parameterSignature) { this.parameterSignature = parameterSignature; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     public String getTaskStatus() { return taskStatus; }

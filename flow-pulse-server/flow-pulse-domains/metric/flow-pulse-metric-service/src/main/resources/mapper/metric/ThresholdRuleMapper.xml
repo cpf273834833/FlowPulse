@@ -101,16 +101,16 @@
         select count(1) from fp_threshold_rule where tenant_id = #{tenantId} and scope_type = #{scopeType}
     </select>
 
-    <select id="selectEnabledResourceRules" resultMap="ThresholdRuleMap">
+    <select id="selectEnabledRulesForMetricObject" resultMap="ThresholdRuleMap">
         select r.*, m.metric_code, m.metric_name
         from fp_threshold_rule r
         left join fp_metric_definition m on m.tenant_id = r.tenant_id and m.id = r.metric_definition_id
         where r.tenant_id = #{tenantId}
           and r.metric_definition_id = #{metricDefinitionId}
-          and r.scope_type = 'RESOURCE'
           and r.object_type = #{objectType}
           and r.object_id = #{objectId}
           and r.enabled = true
+          and r.scope_type in ('RESOURCE', 'TOPOLOGY_ELEMENT')
         order by r.updated_at desc
     </select>
 

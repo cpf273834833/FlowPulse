@@ -8,6 +8,7 @@ import java.util.List;
 public interface AlertStateMapper {
     AlertStateEntity selectById(@Param("tenantId") String tenantId, @Param("id") String id);
     AlertStateEntity selectByAlertKey(@Param("tenantId") String tenantId, @Param("alertKey") String alertKey);
+    AlertStateEntity selectActiveByBaseAlertKey(@Param("tenantId") String tenantId, @Param("baseAlertKey") String baseAlertKey);
     List<AlertStateEntity> selectPage(@Param("tenantId") String tenantId, @Param("keyword") String keyword,
                                       @Param("level") String level, @Param("status") String status,
                                       @Param("objectType") String objectType, @Param("topologyId") String topologyId,

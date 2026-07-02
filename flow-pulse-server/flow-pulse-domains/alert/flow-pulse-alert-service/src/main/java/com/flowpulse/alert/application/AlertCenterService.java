@@ -136,8 +136,8 @@ public class AlertCenterService {
 
     private List<StatCard> buildStats(String tenantId) {
         List<StatCard> stats = new ArrayList<StatCard>();
-        stats.add(new StatCard("当前告警", String.valueOf(alertStateMapper.countAll(tenantId)), "当前可追踪的告警状态"));
-        stats.add(new StatCard("未恢复", String.valueOf(alertStateMapper.countByStatus(tenantId, "ACTIVE")), "仍在影响对象状态"));
+        stats.add(new StatCard("故障记录", String.valueOf(alertStateMapper.countAll(tenantId)), "按触发到恢复形成闭环"));
+        stats.add(new StatCard("活动故障", String.valueOf(alertStateMapper.countByStatus(tenantId, "ACTIVE")), "仍在影响对象状态"));
         stats.add(new StatCard("紧急", String.valueOf(alertStateMapper.countByLevel(tenantId, "CRITICAL")), "需要立即处理"));
         stats.add(new StatCard("错误", String.valueOf(alertStateMapper.countByLevel(tenantId, "ERROR")), "已经触发错误级别"));
         return stats;

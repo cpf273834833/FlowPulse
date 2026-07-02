@@ -20,7 +20,7 @@ public class ExpressionMetricCollector implements MetricCollector {
     public MetricCollectResult collect(MetricCollectContext context) {
         String valueExpression = firstNotBlank(
                 valueReader.readStringField(context.getConfig().getParameterJson(), "value"),
-                valueReader.readStringField(context.getImplementation().getConfigJson(), "value"),
+                "",
                 context.getImplementation().getScriptContent());
         double value = valueReader.readValue(valueExpression);
         return MetricCollectResult.success(value, "Expression metric collected.", "{\"source\":\"EXPRESSION\"}");

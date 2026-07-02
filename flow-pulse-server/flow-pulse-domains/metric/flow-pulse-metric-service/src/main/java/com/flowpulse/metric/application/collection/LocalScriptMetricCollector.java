@@ -30,7 +30,7 @@ public class LocalScriptMetricCollector extends AbstractScriptMetricCollector {
         try {
             ProcessBuilder builder = new ProcessBuilder(command(implementation, script));
             builder.redirectErrorStream(true);
-            applyEnvironment(builder, context.getConfig());
+            applyEnvironment(builder, context);
             Process process = builder.start();
             String output = readOutput(process);
             waitFor(process, timeoutSeconds(implementation));
@@ -73,9 +73,9 @@ public class LocalScriptMetricCollector extends AbstractScriptMetricCollector {
         return command;
     }
 
-    private void applyEnvironment(ProcessBuilder builder, ResourceMetricConfigEntity config) {
+    private void applyEnvironment(ProcessBuilder builder, MetricCollectContext context) {
         for (String key : new String[]{"FP_TENANT_ID", "FP_OBJECT_TYPE", "FP_OBJECT_ID", "FP_OBJECT_CODE", "FP_OBJECT_NAME", "FP_PARAMETER_JSON"}) {
-            builder.environment().put(key, safe(envValue(config, key)));
+            builder.environment().put(key, safe(envValue(context, key)));
         }
     }
 

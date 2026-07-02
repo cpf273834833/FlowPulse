@@ -12,6 +12,10 @@
         <result column="target_node_id" property="targetNodeId"/>
         <result column="relation_type" property="relationType"/>
         <result column="relation_id" property="relationId"/>
+        <result column="source_object_type" property="sourceObjectType"/>
+        <result column="source_object_id" property="sourceObjectId"/>
+        <result column="target_object_type" property="targetObjectType"/>
+        <result column="target_object_id" property="targetObjectId"/>
         <result column="path_json" property="pathJson"/>
         <result column="label_position_json" property="labelPositionJson"/>
         <result column="style_json" property="styleJson"/>
@@ -20,11 +24,12 @@
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
+    <select id="selectById" resultMap="TopologyEdgeMap">select * from fp_topology_edge where tenant_id=#{tenantId} and id=#{id}</select>
     <select id="selectByTopologyId" resultMap="TopologyEdgeMap">select * from fp_topology_edge where tenant_id=#{tenantId} and topology_id=#{topologyId} order by created_at</select>
     <select id="countAll" resultType="long">select count(1) from fp_topology_edge where tenant_id=#{tenantId}</select>
     <insert id="insert" parameterType="com.flowpulse.topology.domain.model.TopologyEdgeEntity">
-        insert into fp_topology_edge (id, tenant_id, topology_id, edge_key, edge_name, edge_type, source_node_id, target_node_id, relation_type, relation_id, path_json, label_position_json, style_json, metric_display_json, hidden, created_at, updated_at)
-        values (#{id}, #{tenantId}, #{topologyId}, #{edgeKey}, #{edgeName}, #{edgeType}, #{sourceNodeId}, #{targetNodeId}, #{relationType}, #{relationId}, #{pathJson}, #{labelPositionJson}, #{styleJson}, #{metricDisplayJson}, #{hidden}, #{createdAt}, #{updatedAt})
+        insert into fp_topology_edge (id, tenant_id, topology_id, edge_key, edge_name, edge_type, source_node_id, target_node_id, relation_type, relation_id, source_object_type, source_object_id, target_object_type, target_object_id, path_json, label_position_json, style_json, metric_display_json, hidden, created_at, updated_at)
+        values (#{id}, #{tenantId}, #{topologyId}, #{edgeKey}, #{edgeName}, #{edgeType}, #{sourceNodeId}, #{targetNodeId}, #{relationType}, #{relationId}, #{sourceObjectType}, #{sourceObjectId}, #{targetObjectType}, #{targetObjectId}, #{pathJson}, #{labelPositionJson}, #{styleJson}, #{metricDisplayJson}, #{hidden}, #{createdAt}, #{updatedAt})
     </insert>
     <delete id="deleteByTopologyId">delete from fp_topology_edge where tenant_id=#{tenantId} and topology_id=#{topologyId}</delete>
 </mapper>

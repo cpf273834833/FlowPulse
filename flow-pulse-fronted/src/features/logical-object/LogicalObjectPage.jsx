@@ -293,7 +293,7 @@ export default function LogicalObjectPage() {
         <button className="fp-button fp-button--primary" type="button" onClick={openCreate}>新增逻辑对象</button>
       </header>
       <StatCards stats={logicalObjectStats(page.records, page.total)} />
-      <section className="fp-logical-layout">
+      <section className="fp-logical-layout fp-logical-layout--single">
         <main className="fp-card fp-logical-main">
           <div className="fp-filter-row">
             <label className="fp-inline-search"><span>⌕</span><input value={query.keyword} placeholder="搜索名称、编码、匹配表达式" onChange={(event) => setQuery({ ...query, keyword: event.target.value })} onKeyDown={(event) => event.key === 'Enter' && loadPage({ ...query, pageNo: 1 })} /></label>
@@ -304,7 +304,7 @@ export default function LogicalObjectPage() {
           <div className="fp-logical-card-grid">
             {page.records.map((item) => (
               <article className={`fp-logical-card ${selected?.id === item.id ? 'is-active' : ''}`} key={item.id}>
-                <button type="button" onClick={() => selectItem(item)}>
+                <button type="button" onClick={() => openEdit(item)}>
                   <div><strong>{item.objectName}</strong><span>{item.objectCode}</span></div>
                   <em>{labelOf(OBJECT_TYPES, item.objectType)}</em>
                   <p>{item.matchPattern || '未配置匹配表达式'}</p>
@@ -320,40 +320,6 @@ export default function LogicalObjectPage() {
           </div>
           <Pagination pageNo={page.pageNo} pageSize={page.pageSize} total={page.total} onChange={(next) => loadPage({ ...query, ...next })} />
         </main>
-        <aside className="fp-card fp-logical-side">
-          <div className="fp-logical-side__head">
-            <h2>{selected?.objectName || '选择逻辑对象'}</h2>
-            <p>{selected?.objectCode || '查看实例解析、聚合策略和最近匹配到的物理实例。'}</p>
-          </div>
-          {selected ? (
-            <>
-              <div className="fp-actions fp-logical-side-actions">
-                <button className="fp-button fp-button--primary" type="button" onClick={resolveSelected}>解析实例</button>
-                <button className="fp-button" type="button" onClick={() => openEdit(selected)}>编辑配置</button>
-              </div>
-              <div className="fp-info-grid">
-                <Info label="对象类型" value={labelOf(OBJECT_TYPES, selected.objectType)} />
-                <Info label="来源类型" value={selected.sourceType} />
-                <Info label="匹配方式" value={selected.matchType} />
-                <Info label="匹配字段" value={selected.matchField} />
-              </div>
-              <CodePreview title="匹配表达式" value={selected.matchPattern || '-'} />
-              <CodePreview title="聚合策略" value={selected.aggregationJson || '{}'} />
-              <div className="fp-side-section">
-                <div className="fp-side-section__title"><h3>实例快照</h3><button className="fp-link-button" type="button" onClick={() => loadInstances()}>刷新</button></div>
-                <div className="fp-logical-instance-list">
-                  {instances.records.map((instance) => (
-                    <div className="fp-logical-instance" key={instance.id}>
-                      <strong>{instance.physicalObjectName || instance.physicalObjectCode}</strong>
-                      <span>{instance.physicalObjectType} / {instance.status}</span>
-                    </div>
-                  ))}
-                  {instances.records.length === 0 ? <div className="fp-empty">暂无实例快照</div> : null}
-                </div>
-              </div>
-            </>
-          ) : <div className="fp-empty">暂无选中对象</div>}
-        </aside>
       </section>
       {confirm ? <ConfirmDialog {...confirm} /> : null}
       {toast ? <Toast {...toast} onClose={() => setToast(null)} /> : null}
@@ -362,7 +328,6 @@ export default function LogicalObjectPage() {
 }
 
 function AggregationDesigner({ form, onApplyTemplate, onChange }) {
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const template = AGGREGATION_TEMPLATES[form.objectType];
   const filter = parseJson(form.instanceFilterJson, {});
   const aggregation = parseJson(form.aggregationJson, {});
@@ -417,19 +382,6 @@ function AggregationDesigner({ form, onApplyTemplate, onChange }) {
         <span><code>status == RUNNING</code> 判断实例状态</span>
       </div>
 
-      <button className="fp-link-button fp-logical-advanced-toggle" type="button" onClick={() => setAdvancedOpen((open) => !open)}>
-        {advancedOpen ? '收起高级 JSON' : '展开高级 JSON'}
-      </button>
-      {advancedOpen ? (
-        <div className="fp-logical-advanced-json">
-          <CodeArea label="实例过滤 JSON" value={form.instanceFilterJson} onChange={(value) => onChange('instanceFilterJson', value)} />
-          <ReadOnlyCode label="兼容聚合 JSON（自动生成）" value={stringifyJson(metricsToAggregation(outputList))} />
-          <CodeArea label="输出指标 JSON" value={form.outputMetricJson} onChange={(value) => {
-            onChange('outputMetricJson', value);
-            onChange('aggregationJson', stringifyJson(metricsToAggregation(normalizeOutputMetricDefinitions(parseJson(value, []), aggregation))));
-          }} />
-        </div>
-      ) : null}
     </div>
   );
 }

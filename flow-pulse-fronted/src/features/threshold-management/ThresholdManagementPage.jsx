@@ -16,6 +16,27 @@ const DEFAULT_QUERY = {
   enabled: '',
 };
 
+const CONDITION_SEVERITIES = [
+  ['REMIND', '提醒'],
+  ['WARNING', '警告'],
+  ['ERROR', '错误'],
+  ['CRITICAL', '紧急'],
+];
+
+const CONDITION_OPERATORS = [
+  ['>', '>'],
+  ['>=', '>='],
+  ['<', '<'],
+  ['<=', '<='],
+  ['==', '=='],
+  ['!=', '!='],
+];
+
+const DEFAULT_CONDITIONS = [
+  { enabled: true, severity: 'WARNING', operator: '>', value: 80 },
+  { enabled: true, severity: 'ERROR', operator: '>', value: 90 },
+];
+
 const DEFAULT_FORM = {
   ruleCode: '',
   ruleName: '',
@@ -28,7 +49,8 @@ const DEFAULT_FORM = {
   topologyId: '',
   topologyElementId: '',
   topologyElementType: '',
-  conditionsJson: '[\n  { "severity": "WARNING", "operator": ">", "value": 80 },\n  { "severity": "ERROR", "operator": ">", "value": 90 }\n]',
+  conditionsJson: JSON.stringify(DEFAULT_CONDITIONS),
+  conditions: DEFAULT_CONDITIONS,
   evaluationWindowSec: 60,
   consecutiveCount: 1,
   recoveryPolicy: 'AUTO',
@@ -145,10 +167,9 @@ export default function ThresholdManagementPage() {
       setToast({ type: 'warning', title: '请补全必填信息', message: '规则编码、规则名称和指标定义不能为空。' });
       return;
     }
-    try {
-      JSON.parse(payload.conditionsJson);
-    } catch (error) {
-      setToast({ type: 'error', title: '阈值条件不是合法 JSON', message: error.message });
+    const activeConditions = normalizeConditions(form.conditions).filter((condition) => condition.enabled !== false);
+    if (activeConditions.length === 0 || activeConditions.some((condition) => condition.value === '' || condition.value === null || Number.isNaN(Number(condition.value)))) {
+      setToast({ type: 'warning', title: '请完善阈值条件', message: '至少启用一条阈值条件，并填写有效的阈值数值。' });
       return;
     }
     const response = editingId ? await thresholdApi.update(editingId, payload) : await thresholdApi.create(payload);
@@ -205,7 +226,10 @@ export default function ThresholdManagementPage() {
             <label className="fp-field"><span>判定窗口（秒）</span><input type="number" min="10" value={form.evaluationWindowSec} onChange={(event) => updateForm('evaluationWindowSec', event.target.value)} /></label>
             <label className="fp-field"><span>连续命中次数</span><input type="number" min="1" value={form.consecutiveCount} onChange={(event) => updateForm('consecutiveCount', event.target.value)} /></label>
             <label className="fp-field"><span>启用状态</span><select value={String(form.enabled)} onChange={(event) => updateForm('enabled', event.target.value === 'true')}><option value="true">启用</option><option value="false">停用</option></select></label>
-            <label className="fp-field fp-field--wide"><span>阈值条件 JSON *</span><textarea value={form.conditionsJson} onChange={(event) => updateForm('conditionsJson', event.target.value)} /></label>
+            <ThresholdConditionEditor
+              value={form.conditions}
+              onChange={(conditions) => updateForm('conditions', conditions)}
+            />
             <label className="fp-field fp-field--wide"><span>描述</span><textarea value={form.description} onChange={(event) => updateForm('description', event.target.value)} /></label>
           </div>
         </section>
@@ -244,7 +268,7 @@ export default function ThresholdManagementPage() {
         ))}
       </section>
 
-      <section className="fp-threshold-board">
+      <section className="fp-threshold-board fp-threshold-board--single">
         <div className="fp-card fp-threshold-panel">
           <div className="fp-filter-row fp-filter-row--metric">
             <label className="fp-inline-search">
@@ -265,7 +289,7 @@ export default function ThresholdManagementPage() {
             {loading ? <div className="fp-empty">加载中...</div> : null}
             {!loading && page.records.length === 0 ? <div className="fp-empty">暂无阈值规则</div> : null}
             {page.records.map((rule) => (
-              <div className={`fp-data-table__row ${selected?.id === rule.id ? 'is-selected' : ''}`} key={rule.id} onClick={() => setSelected(rule)}>
+              <div className={`fp-data-table__row ${selected?.id === rule.id ? 'is-selected' : ''}`} key={rule.id} onClick={() => openDetail(rule)}>
                 <strong>{rule.ruleName}<em>{rule.ruleCode}</em></strong>
                 <span>{rule.metricName || rule.metricCode || '-'}</span>
                 <span>{scopeText(rule.scopeType)}</span>
@@ -281,30 +305,6 @@ export default function ThresholdManagementPage() {
           </div>
           <Pagination pageNo={page.pageNo} pageSize={page.pageSize} total={page.total} onChange={(pageNo, pageSize) => setQuery({ ...query, pageNo, pageSize })} />
         </div>
-
-        <aside className="fp-card fp-threshold-side">
-          <div className="fp-threshold-side__head">
-            <h2>{selected?.ruleName || '选择一条阈值规则'}</h2>
-            <p>{selected?.ruleCode || '查看规则作用域、阈值条件和判定策略。'}</p>
-          </div>
-          {selected ? (
-            <>
-              <div className="fp-threshold-kv">
-                <div><span>指标</span><strong>{selected.metricName || selected.metricCode || '-'}</strong></div>
-                <div><span>作用域</span><strong>{scopeText(selected.scopeType)}</strong></div>
-                <div><span>对象</span><strong>{selected.objectName || selected.objectCode || '全局'}</strong></div>
-                <div><span>判定窗口</span><strong>{selected.evaluationWindowSec}s</strong></div>
-                <div><span>连续次数</span><strong>{selected.consecutiveCount}</strong></div>
-                <div><span>恢复策略</span><strong>{selected.recoveryPolicy === 'MANUAL' ? '人工关闭' : '自动恢复'}</strong></div>
-              </div>
-              <pre className="fp-condition-preview">{formatJson(selected.conditionsJson)}</pre>
-              <div className="fp-actions fp-side-section">
-                <button className="fp-button" type="button" onClick={() => openDetail(selected)}>详情</button>
-                <button className="fp-button fp-button--primary" type="button" onClick={() => openEdit(selected)}>编辑</button>
-              </div>
-            </>
-          ) : <div className="fp-empty">暂无选中规则</div>}
-        </aside>
       </section>
 
       {confirm ? <ConfirmDialog {...confirm} /> : null}
@@ -345,7 +345,7 @@ function ThresholdDetailPage({ rule, metric, onBack, onEdit }) {
               <p>按严重等级定义指标值到告警状态的映射关系。</p>
             </div>
           </div>
-          <pre className="fp-condition-preview">{formatJson(rule.conditionsJson)}</pre>
+          <ConditionsPreview conditions={parseConditions(rule.conditionsJson)} />
         </section>
       </div>
     </SecondaryPage>
@@ -366,7 +366,7 @@ function RuleDetail({ rule, metric, onBack, onEdit }) {
             <Info label="判定窗口" value={`${rule.evaluationWindowSec}s`} />
             <Info label="连续命中" value={rule.consecutiveCount} />
           </div>
-          <pre className="fp-condition-preview">{formatJson(rule.conditionsJson)}</pre>
+          <ConditionsPreview conditions={parseConditions(rule.conditionsJson)} />
         </div>
         <div className="fp-modal__footer"><button className="fp-button" type="button" onClick={onBack}>返回</button><button className="fp-button fp-button--primary" type="button" onClick={onEdit}>编辑</button></div>
       </div>
@@ -378,13 +378,77 @@ function Info({ label, value }) {
   return <div className="fp-info-box"><span>{label}</span><strong>{value || '-'}</strong></div>;
 }
 
+function ThresholdConditionEditor({ value, onChange }) {
+  const conditions = normalizeConditions(value);
+  function update(index, field, nextValue) {
+    onChange(conditions.map((condition, currentIndex) => (currentIndex === index ? { ...condition, [field]: nextValue } : condition)));
+  }
+  function addCondition() {
+    onChange(conditions.concat({ enabled: true, severity: 'WARNING', operator: '>=', value: '' }));
+  }
+  function removeCondition(index) {
+    onChange(conditions.filter((_, currentIndex) => currentIndex !== index));
+  }
+  return (
+    <section className="fp-threshold-condition-editor fp-field--wide">
+      <div className="fp-threshold-condition-editor__head">
+        <div>
+          <span>阈值条件 *</span>
+          <p>按告警级别配置判定条件，保存时自动生成后端需要的规则结构。</p>
+        </div>
+        <button className="fp-button" type="button" onClick={addCondition}>新增条件</button>
+      </div>
+      <div className="fp-threshold-condition-list">
+        {conditions.map((condition, index) => (
+          <div className="fp-threshold-condition-row" key={`${condition.severity}-${index}`}>
+            <label className="fp-switch-line">
+              <input type="checkbox" checked={condition.enabled !== false} onChange={(event) => update(index, 'enabled', event.target.checked)} />
+              <span>{condition.enabled !== false ? '参与判定' : '不参与'}</span>
+            </label>
+            <select value={condition.severity || 'WARNING'} onChange={(event) => update(index, 'severity', event.target.value)}>
+              {CONDITION_SEVERITIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+            </select>
+            <select value={condition.operator || '>='} onChange={(event) => update(index, 'operator', event.target.value)}>
+              {CONDITION_OPERATORS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+            </select>
+            <input type="number" value={condition.value ?? ''} placeholder="阈值" onChange={(event) => update(index, 'value', event.target.value)} />
+            <button className="fp-link-button fp-link-button--danger" type="button" onClick={() => removeCondition(index)}>删除</button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ConditionsPreview({ conditions }) {
+  return (
+    <div className="fp-threshold-condition-preview">
+      {normalizeConditions(conditions).map((condition, index) => (
+        <div className="fp-threshold-condition-pill" key={`${condition.severity}-${index}`}>
+          <span>{labelOf(CONDITION_SEVERITIES, condition.severity)}</span>
+          <strong>{condition.operator} {condition.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function toForm(rule) {
-  return { ...DEFAULT_FORM, ...rule, enabled: rule.enabled !== false };
+  return { ...DEFAULT_FORM, ...rule, enabled: rule.enabled !== false, conditions: parseConditions(rule.conditionsJson) };
 }
 
 function normalizePayload(form) {
+  const conditions = normalizeConditions(form.conditions)
+    .filter((condition) => condition.enabled !== false)
+    .map((condition) => ({
+      enabled: true,
+      severity: condition.severity || 'WARNING',
+      operator: condition.operator || '>=',
+      value: Number(condition.value),
+    }));
   return {
     ...form,
+    conditionsJson: JSON.stringify(conditions),
     evaluationWindowSec: Number(form.evaluationWindowSec) || 60,
     consecutiveCount: Number(form.consecutiveCount) || 1,
     objectType: form.scopeType === 'GLOBAL' ? '' : form.objectType,
@@ -395,9 +459,30 @@ function normalizePayload(form) {
   };
 }
 
+function normalizeConditions(value) {
+  if (Array.isArray(value) && value.length > 0) {
+    return value.map((condition) => ({ enabled: condition.enabled !== false, severity: condition.severity || 'WARNING', operator: condition.operator || '>=', value: condition.value ?? '' }));
+  }
+  return DEFAULT_CONDITIONS.map((condition) => ({ ...condition }));
+}
+
+function parseConditions(value) {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return normalizeConditions(parsed);
+  } catch (error) {
+    return normalizeConditions(DEFAULT_CONDITIONS);
+  }
+}
+
 function scopeText(scopeType) {
   const map = { GLOBAL: '全局默认', RESOURCE: '资源对象', TOPOLOGY_ELEMENT: '拓扑元素' };
   return map[scopeType] || scopeType || '-';
+}
+
+function labelOf(options, value) {
+  const option = options.find(([code]) => code === value);
+  return option ? option[1] : value || '-';
 }
 
 function formatJson(value) {

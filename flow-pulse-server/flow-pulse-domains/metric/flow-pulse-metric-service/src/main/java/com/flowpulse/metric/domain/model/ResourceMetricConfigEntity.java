@@ -10,6 +10,10 @@ public class ResourceMetricConfigEntity {
     private String metricDefinitionId;
     private String metricCode;
     private String metricName;
+    private String metricKind;
+    private String instanceDimension;
+    private String sourceMetricCode;
+    private String deriveType;
     private String implementationId;
     private String implementationCode;
     private String implementationName;
@@ -18,6 +22,7 @@ public class ResourceMetricConfigEntity {
     private String executorNodeId;
     private Integer intervalSec;
     private String parameterJson;
+    private String parameterSignature;
     private Boolean enabled;
     private String taskStatus;
     private String lastCollectStatus;
@@ -48,6 +53,14 @@ public class ResourceMetricConfigEntity {
     public void setMetricCode(String metricCode) { this.metricCode = metricCode; }
     public String getMetricName() { return metricName; }
     public void setMetricName(String metricName) { this.metricName = metricName; }
+    public String getMetricKind() { return metricKind; }
+    public void setMetricKind(String metricKind) { this.metricKind = metricKind; }
+    public String getInstanceDimension() { return instanceDimension; }
+    public void setInstanceDimension(String instanceDimension) { this.instanceDimension = instanceDimension; }
+    public String getSourceMetricCode() { return sourceMetricCode; }
+    public void setSourceMetricCode(String sourceMetricCode) { this.sourceMetricCode = sourceMetricCode; }
+    public String getDeriveType() { return deriveType; }
+    public void setDeriveType(String deriveType) { this.deriveType = deriveType; }
     public String getImplementationId() { return implementationId; }
     public void setImplementationId(String implementationId) { this.implementationId = implementationId; }
     public String getImplementationCode() { return implementationCode; }
@@ -64,6 +77,8 @@ public class ResourceMetricConfigEntity {
     public void setIntervalSec(Integer intervalSec) { this.intervalSec = intervalSec; }
     public String getParameterJson() { return parameterJson; }
     public void setParameterJson(String parameterJson) { this.parameterJson = parameterJson; }
+    public String getParameterSignature() { return parameterSignature; }
+    public void setParameterSignature(String parameterSignature) { this.parameterSignature = parameterSignature; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     public String getTaskStatus() { return taskStatus; }

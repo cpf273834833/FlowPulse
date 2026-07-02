@@ -54,6 +54,15 @@
         select * from fp_alert_state where tenant_id = #{tenantId} and alert_key = #{alertKey}
     </select>
 
+    <select id="selectActiveByBaseAlertKey" resultMap="AlertStateMap">
+        select * from fp_alert_state
+        where tenant_id = #{tenantId}
+          and status = 'ACTIVE'
+          and (alert_key = #{baseAlertKey} or alert_key like concat(#{baseAlertKey}, ':%'))
+        order by first_triggered_at desc, created_at desc
+        limit 1
+    </select>
+
     <select id="selectPage" resultMap="AlertStateMap">
         select * from fp_alert_state where <include refid="wherePage"/>
         order by last_changed_at desc, updated_at desc

@@ -12,6 +12,10 @@
         <result property="metricDefinitionId" column="metric_definition_id"/>
         <result property="metricCode" column="metric_code"/>
         <result property="metricName" column="metric_name"/>
+        <result property="metricKind" column="metric_kind"/>
+        <result property="instanceDimension" column="instance_dimension"/>
+        <result property="sourceMetricCode" column="source_metric_code"/>
+        <result property="deriveType" column="derive_type"/>
         <result property="implementationId" column="implementation_id"/>
         <result property="implementationCode" column="implementation_code"/>
         <result property="implementationName" column="implementation_name"/>
@@ -20,6 +24,7 @@
         <result property="executorNodeId" column="executor_node_id"/>
         <result property="intervalSec" column="interval_sec"/>
         <result property="parameterJson" column="parameter_json"/>
+        <result property="parameterSignature" column="parameter_signature"/>
         <result property="enabled" column="enabled"/>
         <result property="taskStatus" column="task_status"/>
         <result property="lastCollectStatus" column="last_collect_status"/>
@@ -34,7 +39,8 @@
     </resultMap>
 
     <sql id="BaseSelect">
-        select c.*, d.metric_code, d.metric_name, i.implementation_code, i.implementation_name, i.implementation_type,
+        select c.*, d.metric_code, d.metric_name, d.metric_kind, d.instance_dimension,
+               d.source_metric_code, d.derive_type, i.implementation_code, i.implementation_name, i.implementation_type,
                s.metric_value as current_value, s.collected_at as current_value_at
         from fp_resource_metric_config c
         left join fp_metric_definition d on d.tenant_id = c.tenant_id and d.id = c.metric_definition_id
@@ -42,9 +48,11 @@
         left join fp_infrastructure_resource r on r.tenant_id = c.tenant_id and r.id = c.object_id
         left join fp_infrastructure f on f.tenant_id = c.tenant_id and f.id = r.infrastructure_id
         left join fp_metric_sample s on s.tenant_id = c.tenant_id and s.config_id = c.id
+          and s.series_type = 'AGGREGATE' and s.instance = '__TOTAL__'
           and s.collected_at = (
               select max(s2.collected_at) from fp_metric_sample s2
               where s2.tenant_id = c.tenant_id and s2.config_id = c.id
+                and s2.series_type = 'AGGREGATE' and s2.instance = '__TOTAL__'
           )
     </sql>
 
@@ -106,6 +114,7 @@
         <include refid="BaseSelect"/>
         where c.tenant_id = #{tenantId} and c.object_type = #{objectType}
           and c.object_id = #{objectId} and c.metric_definition_id = #{metricDefinitionId}
+          and c.parameter_signature = #{parameterSignature}
     </select>
 
     <select id="selectDueTasks" resultMap="ResourceMetricConfigMap">
@@ -123,11 +132,11 @@
     <insert id="insert" parameterType="com.flowpulse.metric.domain.model.ResourceMetricConfigEntity">
         insert into fp_resource_metric_config
         (id, tenant_id, object_type, object_id, object_code, object_name, metric_definition_id, implementation_id,
-         execution_mode, executor_node_id, interval_sec, parameter_json, enabled, task_status, last_collect_status,
+         execution_mode, executor_node_id, interval_sec, parameter_json, parameter_signature, enabled, task_status, last_collect_status,
          last_collect_message, last_collect_at, next_collect_at, description, created_at, updated_at)
         values
         (#{id}, #{tenantId}, #{objectType}, #{objectId}, #{objectCode}, #{objectName}, #{metricDefinitionId}, #{implementationId},
-         #{executionMode}, #{executorNodeId}, #{intervalSec}, #{parameterJson}, #{enabled}, #{taskStatus}, #{lastCollectStatus},
+         #{executionMode}, #{executorNodeId}, #{intervalSec}, #{parameterJson}, #{parameterSignature}, #{enabled}, #{taskStatus}, #{lastCollectStatus},
          #{lastCollectMessage}, #{lastCollectAt}, #{nextCollectAt}, #{description}, #{createdAt}, #{updatedAt})
     </insert>
 
@@ -136,7 +145,7 @@
         set object_type = #{objectType}, object_id = #{objectId}, object_code = #{objectCode}, object_name = #{objectName},
             metric_definition_id = #{metricDefinitionId}, implementation_id = #{implementationId},
             execution_mode = #{executionMode}, executor_node_id = #{executorNodeId}, interval_sec = #{intervalSec},
-            parameter_json = #{parameterJson}, enabled = #{enabled}, task_status = #{taskStatus},
+            parameter_json = #{parameterJson}, parameter_signature = #{parameterSignature}, enabled = #{enabled}, task_status = #{taskStatus},
             last_collect_status = #{lastCollectStatus}, last_collect_message = #{lastCollectMessage},
             last_collect_at = #{lastCollectAt}, next_collect_at = #{nextCollectAt}, description = #{description},
             updated_at = #{updatedAt}

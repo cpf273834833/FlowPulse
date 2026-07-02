@@ -323,14 +323,12 @@ function ScopePanel({ environments, regions, scope, onSelect }) {
               <div className="fp-tree-management" key={management.id}>
                 <button className={scope.regionId === management.id ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: management.id })}>
                   <span>{management.regionName}</span>
-                  <em>{t('managementRegion')}</em>
                 </button>
                 <div className="fp-tree-computes">
                   {regions.filter((region) => region.parentRegionId === management.id).map((compute) => (
                     <div className="fp-tree-compute" key={compute.id}>
                       <button className={scope.regionId === compute.id ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: compute.id })}>
                         <span>{compute.regionName}</span>
-                        <em>{t('computeRegion')}</em>
                       </button>
                     </div>
                   ))}
