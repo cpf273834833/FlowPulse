@@ -242,11 +242,29 @@
 }
 
 .fp-param-template-row label,
+.fp-param-direct-field label,
 .fp-placeholder-rule label {
   display: grid;
   gap: 7px;
   color: #8fb0d2;
   font-size: 12px;
+}
+
+.fp-param-direct-field {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1.2fr);
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.16);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(14, 165, 233, 0.06);
+}
+
+.fp-param-direct-field small {
+  grid-column: 1 / -1;
+  color: #8fb0d2;
 }
 
 .fp-placeholder-panel {
@@ -327,7 +345,8 @@
   }
 
   .fp-placeholder-rule,
-  .fp-param-template-row {
+  .fp-param-template-row,
+  .fp-param-direct-field {
     grid-template-columns: 1fr 1fr;
   }
 }

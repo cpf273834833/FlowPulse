@@ -26,6 +26,7 @@
     <select id="selectById" resultMap="TopologyNodeMap">select * from fp_topology_node where tenant_id=#{tenantId} and id=#{id}</select>
     <select id="selectByTopologyId" resultMap="TopologyNodeMap">select * from fp_topology_node where tenant_id=#{tenantId} and topology_id=#{topologyId} order by created_at</select>
     <select id="countAll" resultType="long">select count(1) from fp_topology_node where tenant_id=#{tenantId}</select>
+    <select id="countByTopologyId" resultType="long">select count(1) from fp_topology_node where tenant_id=#{tenantId} and topology_id=#{topologyId}</select>
     <insert id="insert" parameterType="com.flowpulse.topology.domain.model.TopologyNodeEntity">
         insert into fp_topology_node (id, tenant_id, topology_id, node_key, node_name, node_type, object_type, object_id, object_code, object_name, x, y, width, height, style_json, metric_display_json, hidden, group_key, created_at, updated_at)
         values (#{id}, #{tenantId}, #{topologyId}, #{nodeKey}, #{nodeName}, #{nodeType}, #{objectType}, #{objectId}, #{objectCode}, #{objectName}, #{x}, #{y}, #{width}, #{height}, #{styleJson}, #{metricDisplayJson}, #{hidden}, #{groupKey}, #{createdAt}, #{updatedAt})

@@ -44,6 +44,10 @@ public interface ResourceMetricConfigMapper {
                                                     @Param("metricDefinitionId") String metricDefinitionId,
                                                     @Param("parameterSignature") String parameterSignature);
 
+    List<ResourceMetricConfigEntity> selectTopologyRuntimeConfigs(@Param("tenantId") String tenantId,
+                                                                  @Param("objectIds") List<String> objectIds,
+                                                                  @Param("edgeIds") List<String> edgeIds);
+
     List<ResourceMetricConfigEntity> selectDueTasks(@Param("now") long now, @Param("limit") int limit);
 
     int insert(ResourceMetricConfigEntity entity);

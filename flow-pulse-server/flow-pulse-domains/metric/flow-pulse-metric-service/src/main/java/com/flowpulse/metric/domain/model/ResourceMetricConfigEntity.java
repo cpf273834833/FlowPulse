@@ -23,6 +23,9 @@ public class ResourceMetricConfigEntity {
     private Integer intervalSec;
     private String parameterJson;
     private String parameterSignature;
+    private Boolean showOnTopology;
+    private String displayName;
+    private Integer displayOrder;
     private Boolean enabled;
     private String taskStatus;
     private String lastCollectStatus;
@@ -79,6 +82,12 @@ public class ResourceMetricConfigEntity {
     public void setParameterJson(String parameterJson) { this.parameterJson = parameterJson; }
     public String getParameterSignature() { return parameterSignature; }
     public void setParameterSignature(String parameterSignature) { this.parameterSignature = parameterSignature; }
+    public Boolean getShowOnTopology() { return showOnTopology; }
+    public void setShowOnTopology(Boolean showOnTopology) { this.showOnTopology = showOnTopology; }
+    public String getDisplayName() { return displayName; }
+    public void setDisplayName(String displayName) { this.displayName = displayName; }
+    public Integer getDisplayOrder() { return displayOrder; }
+    public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     public String getTaskStatus() { return taskStatus; }

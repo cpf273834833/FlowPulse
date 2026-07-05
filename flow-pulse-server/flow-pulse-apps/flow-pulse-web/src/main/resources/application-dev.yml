@@ -1,0 +1,15 @@
+biz:
+  app:
+    register: false
+    security:
+      enabled: "false"
+      validation-path:
+        - /__flowpulse_dev_security_disabled__
+      ineffectiveness-path:
+        - /**
+
+whale:
+  distributed:
+    config:
+      bootstrap:
+        enabled: false

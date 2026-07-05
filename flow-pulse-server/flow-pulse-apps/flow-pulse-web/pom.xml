@@ -6,7 +6,7 @@
     <parent>
         <groupId>uyun.flowpulse</groupId>
         <artifactId>flow-pulse-apps</artifactId>
-        <version>2.0.18.50.0</version>
+        <version>2.0.18.60.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>flow-pulse-web</artifactId>
@@ -73,6 +73,25 @@
             <groupId>uyun.flowpulse</groupId>
             <artifactId>flow-pulse-topology-service</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>uyun.whale</groupId>
+            <artifactId>own-consumer-spring-boot-starter</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>uyun.whale</groupId>
+            <artifactId>distributed-config</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>uyun.whale</groupId>
+            <artifactId>util-shell</artifactId>
+            <type>tar.gz</type>
+            <version>2.0.6</version>
+            <classifier>x86_64</classifier>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -115,39 +134,81 @@
         <finalName>${project.artifactId}</finalName>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>db/**</exclude>
+                        <exclude>i18n/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <!-- linux 解析json工具 -->
+                                    <groupId>uyun.whale</groupId>
+                                    <artifactId>util-shell</artifactId>
+                                    <classifier>x86_64</classifier>
+                                    <type>tar.gz</type>
+                                    <overWrite>true</overWrite>
+                                    <outputDirectory>${project.build.directory}/util-shell</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <classifier>boot</classifier>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.7.1</version>
-                <configuration>
-                    <descriptors>
-                        <descriptor>src/main/assembly/omp-assembly.xml</descriptor>
-                    </descriptors>
-                    <tarLongFileMode>posix</tarLongFileMode>
-                    <finalName>FlowPulse-V2.0.R18.50.0-all</finalName>
-                    <appendAssemblyId>false</appendAssemblyId>
-                    <attach>false</attach>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>make-omp-package</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
 
     <profiles>
+        <profile>
+            <id>all</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <version>3.7.1</version>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/main/assembly/omp-assembly.xml</descriptor>
+                            </descriptors>
+                            <tarLongFileMode>posix</tarLongFileMode>
+                            <finalName>FlowPulse-V2.0.R18.60.0-all</finalName>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <attach>false</attach>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>make-omp-package</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>patch</id>
             <build>
@@ -167,7 +228,7 @@
                                     <descriptors>
                                         <descriptor>src/main/assembly/patch-assembly.xml</descriptor>
                                     </descriptors>
-                                    <finalName>FlowPulse-V2.0.R18.50.1-patch</finalName>
+                                    <finalName>FlowPulse-V2.0.R18.60.1-patch</finalName>
                                     <appendAssemblyId>false</appendAssemblyId>
                                     <attach>false</attach>
                                 </configuration>

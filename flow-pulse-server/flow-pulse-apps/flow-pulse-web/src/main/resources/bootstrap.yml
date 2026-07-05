@@ -1,0 +1,131 @@
+# use archetype version: 1.4.9
+
+host:
+  list: ${HOST_LIST:}
+
+uyun:
+  baseurl: ${UYUN_BASEURL:}
+
+biz:
+  app:
+    kind: paas
+    register: true
+    code: FlowPulse
+    lower-code: flowpulse
+    name: flowpulse
+    description:
+      - FlowPulse data-flow observability platform
+      - FlowPulse 数据流可观测平台
+    auth-codes:
+      - code: data_link_view
+        name: Data link view
+        nameCN: 数据链路查看
+        parentCode:
+      - code: alert_manage
+        name: Alert management
+        nameCN: 告警管理
+        parentCode:
+    security:
+      enabled: "true"
+      api-key: 22409e6b6b9511f0898100505699a88b
+      validation-path:
+        - /flowpulse/frontapi/v1/**
+      ineffectiveness-path:
+        - /
+        - /flowpulse/
+        - /static/**
+        - /tenant/**
+        - /frontend/**
+        - /actuator/**
+        - /metrics/**
+        - /h2-console/**
+        - /h2/**
+        - /actuator/health
+        - /favicon.ico
+        - /index.html
+        - /flowpulse/index.html
+        - /flowpulse/openapi/v1/**
+        - /flowpulse/openapi/v2/**
+
+  module:
+    product: FlowPulse
+    name: flowpulse-main
+    alias: platform-flowpulse
+    version: 2.0.18.60.0
+    is_customized: 0
+    author: platform@uyunsoft.cn
+    description:
+      - FlowPulse main module
+      - 应用主模块
+    platform: Linux
+    kernel: 3.10.0-327.el7
+    main-class: com.flowpulse.web.FlowPulseApplication
+    type: main
+    scalable: true
+    enable_reverse_proxy:
+      upstream: |
+        upstream flowpulse {
+        <#list hosts as host>
+          server ${host.ip}:8466;
+        </#list>
+        }
+      location: |
+        location /flowpulse/ {
+          proxy_pass http://flowpulse;
+        }
+    firewall_port: 8466,7601
+    support_opts: start,stop,upgrade,uninstall,download_log
+    database:
+      account:
+        - type: mysql
+          schema: flowpulse
+          username: flowpulse
+    installation:
+      install:
+        cmd: install.sh
+    commands:
+      exec_run: $UYUN_ROOT_DIR/uyun/flowpulse/main/bin/manage.sh run
+      exec_start: $UYUN_ROOT_DIR/uyun/flowpulse/main/bin/manage.sh start
+      exec_stop: $UYUN_ROOT_DIR/uyun/flowpulse/main/bin/manage.sh stop
+      exec_restart: $UYUN_ROOT_DIR/uyun/flowpulse/main/bin/manage.sh restart
+      exec_status: $UYUN_ROOT_DIR/uyun/flowpulse/main/bin/manage.sh status
+      exec_config: $UYUN_ROOT_DIR/uyun/flowpulse/main/bin/config.sh
+    runtime_params:
+      cpu: 2
+      mem: 1024
+      disk: 4
+    dependencies:
+      - module: platform-jdk
+        version: 2.0.0.0
+      - module: platform-apollo-adminservice
+        version: 2.0.0.0
+      - module: platform-apollo-portal
+        version: 2.0.0.0
+      - module: platform-apollo-configservice
+        version: 2.0.0.0
+      - module: platform-tenant
+        version: 2.0.17.0
+      - module: platform-nginx
+        version: 2.0.0.0
+    docker:
+      deployment:
+        img: java
+        kind: deployment
+        scalable: true
+      proxy:
+        external:
+          - path: /flowpulse/
+        ingress:
+          - port: 8466
+            path: /flowpulse(/|$)(.*)
+            rewriteTarget: /$2
+          - port: 8466
+            path: /flowpulse/api(/|$)(.*)
+          - port: 8466
+            path: /flowpulse/openapi/v2(/|$)(.*)
+    web_config:
+      metrics_base_url: 'http://${host.ip}:8466/flowpulse'
+    parameters:
+      bootstrap:
+        - key: jvm
+          val: -Xmx512m -Xms256m -Xss512K -XX:MaxMetaspaceSize=128m

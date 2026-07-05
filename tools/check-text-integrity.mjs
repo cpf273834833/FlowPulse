@@ -30,9 +30,56 @@ const checkedExtensions = new Set([
   '.json',
   '.sql',
   '.sh',
+  '.ps1',
 ]);
 
-const mojibakePattern = /�|脳|鈥|鈹|鍙|鐜|璇|绠|骞|閰|鎵|鏁|鍖|浣|绉|鐞|惧|槸/g;
+const exactBadTokens = [
+  '\u951f', // 锟
+  '\ufffd', // replacement character
+];
+
+// Typical UTF-8 Chinese text decoded as GBK/CP936. Use Unicode escapes here so
+// the checker itself cannot be corrupted by terminal or editor code pages.
+const mojibakeFragments = [
+  '\u935a', // 鍚
+  '\u93b8', // 鎸
+  '\u95b2', // 閲
+  '\u95b0', // 閰
+  '\u7487', // 璇
+  '\u9422', // 鐢
+  '\u7039', // 瀹
+  '\u5f42', // 彂
+  '\u59ab', // 妫
+  '\u6d94', // 涔
+  '\u721c', // 爜
+  '\u6d93', // 涓
+  '\u52ed', // 勭
+  '\u59dd', // 姝
+  '\u68ff', // 棿
+  '\u5bee', // 寮
+  '\u675e', // 杞
+  '\u682b', // 栫
+  '\u785c', // 硜/硅 family
+  '\u7281', // 犁/犱 family
+  '\u509b', // 傛
+  '\u7198', // 熘/熻 family
+  '\u55d8', // 嗘
+  '\u7cba', // 粺
+  '\u6783', // 枃
+  '\u6d60', // 浠
+  '\u6d63', // 浣
+  '\u4f78', // 佸
+  '\u53a4', // 厤
+  '\u6769', // 杩
+  '\u56ec', // 囬
+  '\u93c1', // 鏁
+  '\u5a34', // 娴
+  '\u7470', // 瑰
+  '\u796d', // 祴
+  '\u9a9e', // 骞
+  '\u9353', // 鍓
+  '\ue06c', // private-use chars frequently present in mojibake output
+];
 
 async function collectFiles(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -58,18 +105,33 @@ function lineColumn(content, index) {
   return { line: lines.length, column: lines[lines.length - 1].length + 1 };
 }
 
+function findSuspiciousToken(content) {
+  for (const token of exactBadTokens) {
+    const index = content.indexOf(token);
+    if (index >= 0) {
+      return { token, index };
+    }
+  }
+  for (const token of mojibakeFragments) {
+    const index = content.indexOf(token);
+    if (index >= 0) {
+      return { token, index };
+    }
+  }
+  return null;
+}
+
 const files = await collectFiles(rootDir);
 const findings = [];
 
 for (const file of files) {
   const content = await readFile(file, 'utf8');
-  mojibakePattern.lastIndex = 0;
-  let match;
-  while ((match = mojibakePattern.exec(content)) !== null) {
-    const position = lineColumn(content, match.index);
+  const finding = findSuspiciousToken(content);
+  if (finding) {
+    const position = lineColumn(content, finding.index);
     findings.push({
       file: path.relative(rootDir, file),
-      token: match[0],
+      token: finding.token,
       line: position.line,
       column: position.column,
     });
@@ -78,11 +140,11 @@ for (const file of files) {
 
 if (findings.length > 0) {
   console.error('检测到疑似中文乱码或非法替换字符，请先修复再构建：');
-  for (const finding of findings.slice(0, 80)) {
+  for (const finding of findings.slice(0, 120)) {
     console.error(`- ${finding.file}:${finding.line}:${finding.column} -> ${finding.token}`);
   }
-  if (findings.length > 80) {
-    console.error(`... 还有 ${findings.length - 80} 处未展示`);
+  if (findings.length > 120) {
+    console.error(`... 还有 ${findings.length - 120} 个文件未展示`);
   }
   process.exit(1);
 }

@@ -80,12 +80,14 @@ export function MetricConfigEditor({
   }
 
   function handleMetricChange(metricDefinitionId) {
+    const metric = metrics.find((item) => item.id === metricDefinitionId);
     const implementation = defaultImplementationForMetric(metricDefinitionId);
     update({
       metricDefinitionId,
       implementationId: implementation?.id || '',
       executionMode: implementation?.executionMode || draft.executionMode || 'SERVER',
       parameterJson: '',
+      displayName: draft.displayName || defaultMetricDisplayName(metric),
     });
   }
 
@@ -186,6 +188,32 @@ export function MetricConfigEditor({
             <option value="false">停用</option>
           </select>
         </label>
+        <label>
+          <span>拓扑展示</span>
+          <select value={String(draft.showOnTopology !== false)} onChange={(event) => update({ showOnTopology: event.target.value === 'true' })}>
+            <option value="true">展示</option>
+            <option value="false">不展示</option>
+          </select>
+        </label>
+        <label>
+          <span>显示名称</span>
+          <input
+            maxLength="64"
+            value={draft.displayName || ''}
+            placeholder={defaultMetricDisplayName(selectedMetric)}
+            onChange={(event) => update({ displayName: event.target.value })}
+          />
+          <small className="fp-field-tip">拓扑图展示短名称，例如：积压、状态、提交。</small>
+        </label>
+        <label>
+          <span>展示排序</span>
+          <input
+            type="number"
+            value={draft.displayOrder ?? 100}
+            onChange={(event) => update({ displayOrder: Number(event.target.value) })}
+          />
+          <small className="fp-field-tip">数字越小越优先；异常指标会自动排在正常指标前。</small>
+        </label>
       </div>
 
       {metrics.length === 0 ? (
@@ -272,6 +300,9 @@ export function MetricParameterEditor({ context, metric, implementation, draft, 
           const definition = schema[paramKey];
           const parameter = config.parameters[paramKey];
           const placeholders = detectPlaceholders(parameter.template);
+          const directFieldOptions = fieldOptionsForSource(parameter.sourceType, context, definition);
+          const directFieldSelected = directFieldOptions.some((option) => option.value === parameter.fieldName) ? parameter.fieldName : '__CUSTOM__';
+          const useDirectFieldSelect = parameter.valueMode === 'FIELD' && directFieldOptions.length > 0;
           return (
             <section className="fp-param-item" key={paramKey}>
               <div className="fp-param-item__head">
@@ -284,9 +315,27 @@ export function MetricParameterEditor({ context, metric, implementation, draft, 
 
               <div className="fp-param-template-row">
                 <label>
-                  <span>参数值模板</span>
+                  <span>取值方式</span>
+                  <select value={parameter.valueMode} onChange={(event) => {
+                    const valueMode = event.target.value;
+                    const sourceType = valueMode === 'FIELD' ? defaultSourceType(context) : parameter.sourceType;
+                    const options = fieldOptionsForSource(sourceType, context, definition);
+                    updateParameter(paramKey, {
+                      valueMode,
+                      sourceType,
+                      fieldName: valueMode === 'FIELD' ? (options[0]?.value || '') : parameter.fieldName,
+                    });
+                  }}>
+                    <option value="FIXED">固定值</option>
+                    <option value="FIELD">资源字段</option>
+                    <option value="TEMPLATE">模板占位符</option>
+                  </select>
+                </label>
+                <label>
+                  <span>{parameter.valueMode === 'TEMPLATE' ? '参数模板' : '参数值'}</span>
                   <input
                     value={parameter.template}
+                    disabled={parameter.valueMode === 'FIELD'}
                     placeholder={definition.placeholder || definition.example || '固定值或 {字段占位符}'}
                     onChange={(event) => updateParameter(paramKey, { template: event.target.value })}
                   />
@@ -300,7 +349,37 @@ export function MetricParameterEditor({ context, metric, implementation, draft, 
                 </label>
               </div>
 
-              {placeholders.length > 0 ? (
+              {parameter.valueMode === 'FIELD' ? (
+                <div className="fp-param-direct-field">
+                  <label>
+                    <span>字段来源</span>
+                    <select value={parameter.sourceType} onChange={(event) => {
+                      const sourceType = event.target.value;
+                      const options = fieldOptionsForSource(sourceType, context, definition);
+                      updateParameter(paramKey, { sourceType, fieldName: options[0]?.value || '' });
+                    }}>
+                      {placeholderSourceOptions(context).filter((option) => option.value !== 'FIXED_VALUE').map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>字段名</span>
+                    {useDirectFieldSelect ? (
+                      <select value={directFieldSelected} onChange={(event) => updateParameter(paramKey, { fieldName: event.target.value === '__CUSTOM__' ? '' : event.target.value })}>
+                        {directFieldOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        <option value="__CUSTOM__">自定义字段...</option>
+                      </select>
+                    ) : null}
+                    {!useDirectFieldSelect || directFieldSelected === '__CUSTOM__' ? (
+                      <input value={parameter.fieldName} placeholder={fieldPlaceholderForSource(parameter.sourceType)} onChange={(event) => updateParameter(paramKey, { fieldName: event.target.value })} />
+                    ) : null}
+                  </label>
+                  <small>保存后会直接把该字段值作为参数值，不需要再写 {'{占位符}'}。</small>
+                </div>
+              ) : null}
+
+              {parameter.valueMode === 'TEMPLATE' && placeholders.length > 0 ? (
                 <div className="fp-placeholder-panel">
                   <div className="fp-placeholder-panel__head">
                     <strong>检测到占位符</strong>
@@ -317,9 +396,15 @@ export function MetricParameterEditor({ context, metric, implementation, draft, 
                     />
                   ))}
                 </div>
-              ) : (
+              ) : null}
+
+              {parameter.valueMode === 'TEMPLATE' && placeholders.length === 0 ? (
+                <div className="fp-param-hint">未检测到占位符，该模板会按固定文本传入。</div>
+              ) : null}
+
+              {parameter.valueMode === 'FIXED' ? (
                 <div className="fp-param-hint">未检测到占位符，该参数会按固定值传入。</div>
-              )}
+              ) : null}
             </section>
           );
         })}
@@ -480,6 +565,9 @@ export function normalizeMetricParameterConfig(value = {}, context, schema = {})
 
 function normalizeParameterConfig(value = {}, definition = {}, context, legacyResolvers = []) {
   const template = value.template !== undefined ? String(value.template) : String(definition.defaultValue ?? definition.template ?? '');
+  const valueMode = normalizeValueMode(value.valueMode || value.mode, template);
+  const sourceType = value.sourceType || defaultSourceType(context);
+  const fieldName = value.fieldName || '';
   const placeholders = {};
   const rawPlaceholders = value.placeholders && typeof value.placeholders === 'object' ? value.placeholders : {};
 
@@ -503,9 +591,18 @@ function normalizeParameterConfig(value = {}, definition = {}, context, legacyRe
     label: definition.label || value.label || '',
     required: definition.required !== false,
     dataType: value.dataType || definition.dataType || 'STRING',
+    valueMode,
+    sourceType,
+    fieldName,
     template,
     placeholders,
   };
+}
+
+function normalizeValueMode(value, template = '') {
+  if (value === 'FIELD' || value === 'TEMPLATE') return value;
+  if (detectPlaceholders(template).length > 0) return 'TEMPLATE';
+  return 'FIXED';
 }
 
 function normalizePlaceholderRule(value = {}, context) {
@@ -541,7 +638,22 @@ function syncTemplateAndResolvers(config) {
   const resolvers = [];
   Object.keys(config.parameters || {}).forEach((key) => {
     const parameter = config.parameters[key];
-    template[key] = parameter.template;
+    template[key] = parameter.valueMode === 'FIELD' ? `{${key}}` : parameter.template;
+    if (parameter.valueMode === 'FIELD') {
+      resolvers.push({
+        placeholder: key,
+        parameterKey: key,
+        sourceType: parameter.sourceType,
+        fieldName: parameter.fieldName,
+        value: '',
+        format: '',
+        dataType: parameter.dataType,
+        operator: 'NONE',
+        compareValue: '',
+        missingPolicy: 'KEEP_PLACEHOLDER',
+        transform: { type: 'NONE' },
+      });
+    }
     Object.keys(parameter.placeholders || {}).forEach((placeholder) => {
       const rule = parameter.placeholders[placeholder];
       resolvers.push({
@@ -594,7 +706,14 @@ function validateMetricParameterConfig(metric, implementation, config) {
     return `当前采集实现缺少指标定义必需参数：${missingImplementationParams.join('、')}`;
   }
   const schema = mergeParameterSchemas(metric, implementation);
-  const missingConfigParams = Object.keys(schema).filter((key) => schema[key].required && !String(config.parameters[key]?.template || '').trim());
+  const missingConfigParams = Object.keys(schema).filter((key) => {
+    if (!schema[key].required) return false;
+    const parameter = config.parameters[key] || {};
+    if (parameter.valueMode === 'FIELD') {
+      return !String(parameter.fieldName || '').trim();
+    }
+    return !String(parameter.template || '').trim();
+  });
   if (missingConfigParams.length > 0) {
     return `请先配置必填参数：${missingConfigParams.join('、')}`;
   }
@@ -804,4 +923,18 @@ function indexById(items) {
   const map = {};
   items.forEach((item) => { map[item.id] = item; });
   return map;
+}
+
+function defaultMetricDisplayName(metric) {
+  const name = metric?.metricName || metric?.metricCode || '';
+  return compactMetricDisplayName(name);
+}
+
+function compactMetricDisplayName(name) {
+  const normalized = String(name || '')
+    .replace(/^Kafka\s*/i, '')
+    .replace(/^Spark\s*/i, '')
+    .replace(/^ES\s*/i, '')
+    .replace(/\s+/g, '');
+  return normalized.length > 8 ? normalized.slice(0, 8) : normalized;
 }

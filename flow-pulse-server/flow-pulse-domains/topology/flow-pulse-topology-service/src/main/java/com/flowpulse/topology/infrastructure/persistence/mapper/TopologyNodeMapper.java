@@ -9,6 +9,7 @@ public interface TopologyNodeMapper {
     TopologyNodeEntity selectById(@Param("tenantId") String tenantId, @Param("id") String id);
     List<TopologyNodeEntity> selectByTopologyId(@Param("tenantId") String tenantId, @Param("topologyId") String topologyId);
     long countAll(@Param("tenantId") String tenantId);
+    long countByTopologyId(@Param("tenantId") String tenantId, @Param("topologyId") String topologyId);
     void insert(TopologyNodeEntity entity);
     void deleteByTopologyId(@Param("tenantId") String tenantId, @Param("topologyId") String topologyId);
 }

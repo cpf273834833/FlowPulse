@@ -75,6 +75,12 @@ public class MetricParameterTemplateResolver {
             Map.Entry<String, JsonNode> entry = fields.next();
             String key = entry.getKey();
             JsonNode parameterNode = entry.getValue();
+            String valueMode = defaultText(text(parameterNode, "valueMode"), "FIXED");
+            if ("FIELD".equalsIgnoreCase(valueMode)) {
+                PlaceholderResolver directResolver = parseResolver(parameterNode, key);
+                resolved.put(key, resolvePlaceholder(directResolver, context, ""));
+                continue;
+            }
             String template = text(parameterNode, "template");
             Map<String, PlaceholderResolver> resolvers = parseParameterResolvers(parameterNode.path("placeholders"));
             resolved.put(key, resolveText(template, context, resolvers));

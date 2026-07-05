@@ -7,6 +7,9 @@ public class TopologyResponse {
     private String envId;
     private String description;
     private String canvasConfigJson;
+    private Long nodeCount;
+    private Long edgeCount;
+    private String alertLevel;
     private Long createdAt;
     private Long updatedAt;
 
@@ -22,6 +25,12 @@ public class TopologyResponse {
     public void setDescription(String description) { this.description = description; }
     public String getCanvasConfigJson() { return canvasConfigJson; }
     public void setCanvasConfigJson(String canvasConfigJson) { this.canvasConfigJson = canvasConfigJson; }
+    public Long getNodeCount() { return nodeCount; }
+    public void setNodeCount(Long nodeCount) { this.nodeCount = nodeCount; }
+    public Long getEdgeCount() { return edgeCount; }
+    public void setEdgeCount(Long edgeCount) { this.edgeCount = edgeCount; }
+    public String getAlertLevel() { return alertLevel; }
+    public void setAlertLevel(String alertLevel) { this.alertLevel = alertLevel; }
     public Long getCreatedAt() { return createdAt; }
     public void setCreatedAt(Long createdAt) { this.createdAt = createdAt; }
     public Long getUpdatedAt() { return updatedAt; }

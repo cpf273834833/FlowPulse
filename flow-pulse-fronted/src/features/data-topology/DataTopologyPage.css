@@ -149,6 +149,21 @@
   transform: translateY(-1px);
 }
 
+.fp-topology-card.is-alert-warning {
+  border-color: rgba(255, 202, 100, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 202, 100, 0.12), 0 18px 38px rgba(0, 0, 0, 0.24);
+}
+
+.fp-topology-card.is-alert-error {
+  border-color: rgba(255, 139, 64, 0.76);
+  box-shadow: 0 0 0 1px rgba(255, 139, 64, 0.14), 0 18px 38px rgba(0, 0, 0, 0.24);
+}
+
+.fp-topology-card.is-alert-critical {
+  border-color: rgba(255, 77, 120, 0.82);
+  box-shadow: 0 0 20px rgba(255, 77, 120, 0.18), 0 18px 38px rgba(0, 0, 0, 0.26);
+}
+
 .fp-topology-card__main {
   display: grid;
   gap: 12px;
@@ -284,6 +299,20 @@
   background:
     radial-gradient(circle at 10% 0%, rgba(40, 184, 255, 0.16), transparent 30%),
     linear-gradient(135deg, rgba(4, 16, 34, 0.98), rgba(8, 10, 30, 0.98));
+}
+
+.fp-topology-editor-page.is-screen-fullscreen .fp-topology-canvas-header,
+.fp-topology-editor-page.is-screen-fullscreen .fp-topology-side {
+  display: none;
+}
+
+.fp-topology-editor-page.is-screen-fullscreen .fp-topology-canvas-layout {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: calc(100vh - 28px);
+}
+
+.fp-topology-editor-page.is-screen-fullscreen .fp-topology-canvas {
+  min-height: calc(100vh - 28px);
 }
 
 .fp-topology-canvas-header {
@@ -720,7 +749,7 @@
   left: 14px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 6px;
   border: 1px solid rgba(104, 158, 220, 0.24);
   border-radius: 14px;
@@ -730,10 +759,16 @@
 }
 
 .fp-canvas-view-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
   height: 30px;
+  padding: 0 10px;
   border: 1px solid rgba(104, 158, 220, 0.2);
   border-radius: 10px;
   color: #dff3ff;
+  font-size: 12px;
   font-weight: 800;
   background: rgba(8, 28, 54, 0.8);
   cursor: pointer;
@@ -745,11 +780,18 @@
   background: linear-gradient(135deg, rgba(30, 144, 255, 0.92), rgba(23, 88, 210, 0.86));
 }
 
-.fp-canvas-view-toolbar span {
+.fp-canvas-view-toolbar span,
+.fp-canvas-view-toolbar strong {
   padding: 0 8px;
   color: var(--fp-muted);
   font-size: 12px;
   white-space: nowrap;
+}
+
+.fp-canvas-view-toolbar strong {
+  min-width: 44px;
+  color: #f4fbff;
+  text-align: center;
 }
 
 .fp-topology-canvas {
@@ -774,6 +816,17 @@
 
 .fp-topology-canvas.is-panning {
   cursor: grabbing;
+}
+
+.fp-topology-align-guides {
+  pointer-events: none;
+}
+
+.fp-topology-align-guides line {
+  stroke: rgba(80, 220, 255, 0.92);
+  stroke-width: 1.4;
+  stroke-dasharray: 6 6;
+  filter: drop-shadow(0 0 8px rgba(40, 184, 255, 0.72));
 }
 
 .fp-topology-empty-canvas {
@@ -811,75 +864,123 @@
   cursor: grabbing;
 }
 
-.fp-topology-node rect {
-  fill: rgba(8, 28, 54, 0.96);
-  stroke: rgba(40, 184, 255, 0.45);
-  stroke-width: 1.6;
-  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.2));
+.fp-topology-node-card {
+  fill: url(#fp-node-bg);
+  stroke: rgba(40, 184, 255, 0.5);
+  stroke-width: 1.5;
+  filter:
+    drop-shadow(0 18px 28px rgba(0, 0, 0, 0.34))
+    drop-shadow(0 0 18px rgba(40, 184, 255, 0.16));
 }
 
-.fp-topology-node.is-selected rect,
-.fp-topology-node.is-linking rect {
+.fp-topology-node.is-selected .fp-topology-node-card,
+.fp-topology-node.is-linking .fp-topology-node-card {
   stroke: var(--fp-primary);
   stroke-width: 2.6;
+  filter:
+    drop-shadow(0 16px 24px rgba(0, 0, 0, 0.28))
+    drop-shadow(0 0 18px rgba(40, 184, 255, 0.36));
 }
 
-.fp-topology-status-dot {
-  fill: #47e59b;
-  stroke: rgba(218, 255, 240, 0.82);
-  stroke-width: 1;
-  filter: drop-shadow(0 0 8px rgba(71, 229, 155, 0.58));
+.fp-topology-node-icon {
+  pointer-events: none;
 }
 
-.fp-topology-node.is-alert-info rect {
+.fp-topology-node.is-alert-info .fp-topology-node-card {
   stroke: rgba(142, 171, 255, 0.72);
   filter: drop-shadow(0 0 14px rgba(94, 130, 255, 0.32));
 }
 
-.fp-topology-node.is-alert-warning rect {
+.fp-topology-node.is-alert-warning .fp-topology-node-card {
   stroke: rgba(255, 202, 100, 0.88);
   filter: drop-shadow(0 0 16px rgba(255, 202, 100, 0.36));
 }
 
-.fp-topology-node.is-alert-error rect {
+.fp-topology-node.is-alert-error .fp-topology-node-card {
   stroke: rgba(255, 139, 64, 0.92);
   filter: drop-shadow(0 0 18px rgba(255, 139, 64, 0.42));
 }
 
-.fp-topology-node.is-alert-critical rect {
+.fp-topology-node.is-alert-critical .fp-topology-node-card {
   stroke: rgba(255, 77, 120, 0.96);
   filter: drop-shadow(0 0 22px rgba(255, 77, 120, 0.56));
   animation: fp-topology-critical-pulse 1.8s ease-in-out infinite;
 }
 
-.fp-topology-node.is-alert-unknown rect {
+.fp-topology-node.is-alert-unknown .fp-topology-node-card {
   stroke: rgba(150, 165, 190, 0.78);
 }
 
-.fp-topology-node.is-alert-info .fp-topology-status-dot { fill: #8eaaff; }
-.fp-topology-node.is-alert-warning .fp-topology-status-dot { fill: #ffca64; }
-.fp-topology-node.is-alert-error .fp-topology-status-dot { fill: #ff8b40; }
-.fp-topology-node.is-alert-critical .fp-topology-status-dot { fill: #ff4d78; }
-.fp-topology-node.is-alert-unknown .fp-topology-status-dot { fill: #96a5be; }
-
 .fp-topology-node text {
   fill: var(--fp-text);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   pointer-events: none;
 }
 
+.fp-topology-node .fp-node-title {
+  font-size: 17px;
+  letter-spacing: -0.2px;
+}
+
 .fp-topology-node .fp-node-sub {
-  fill: var(--fp-muted);
+  fill: #98b4d3;
   font-size: 12px;
   font-weight: 500;
 }
 
-.fp-node-metrics rect {
-  fill: rgba(3, 12, 26, 0.9);
-  stroke: rgba(40, 184, 255, 0.38);
+.fp-node-status rect {
+  fill: rgba(36, 214, 134, 0.18);
+  stroke: rgba(36, 214, 134, 0.42);
   stroke-width: 1;
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.28));
+}
+
+.fp-node-status text {
+  fill: #55f2a8;
+  font-size: 11px;
+  font-weight: 900;
+  text-anchor: middle;
+}
+
+.fp-node-status.is-alert-info rect {
+  fill: rgba(72, 105, 210, 0.24);
+  stroke: rgba(142, 171, 255, 0.5);
+}
+
+.fp-node-status.is-alert-info text { fill: #a9bcff; }
+
+.fp-node-status.is-alert-warning rect {
+  fill: rgba(255, 184, 42, 0.2);
+  stroke: rgba(255, 202, 100, 0.5);
+}
+
+.fp-node-status.is-alert-warning text { fill: #ffce6b; }
+
+.fp-node-status.is-alert-error rect {
+  fill: rgba(255, 139, 64, 0.22);
+  stroke: rgba(255, 139, 64, 0.58);
+}
+
+.fp-node-status.is-alert-error text { fill: #ff9d5e; }
+
+.fp-node-status.is-alert-critical rect {
+  fill: rgba(255, 77, 120, 0.24);
+  stroke: rgba(255, 77, 120, 0.68);
+}
+
+.fp-node-status.is-alert-critical text { fill: #ff6b95; }
+
+.fp-node-status.is-alert-unknown rect {
+  fill: rgba(150, 165, 190, 0.18);
+  stroke: rgba(150, 165, 190, 0.48);
+}
+
+.fp-node-status.is-alert-unknown text { fill: #bdc9d8; }
+
+.fp-node-divider {
+  stroke: rgba(121, 166, 214, 0.18);
+  stroke-width: 1;
+  pointer-events: none;
 }
 
 .fp-node-metrics text {
@@ -888,57 +989,20 @@
 }
 
 .fp-node-metrics .fp-node-metric-name {
-  fill: #a8d8ff;
+  fill: #9fb6d2;
+  font-size: 10px;
 }
 
 .fp-node-metrics .fp-node-metric-value {
   fill: #ffffff;
-  text-anchor: end;
+  font-size: 12px;
   font-weight: 950;
 }
 
-.fp-node-metric.is-alert-info rect,
-.fp-topology-edge-metric.is-alert-info rect {
-  fill: rgba(72, 105, 210, 0.34);
-  stroke: rgba(142, 171, 255, 0.62);
-}
-
-.fp-node-metric.is-alert-warning rect,
-.fp-topology-edge-metric.is-alert-warning rect {
-  fill: rgba(101, 70, 12, 0.64);
-  stroke: rgba(255, 202, 100, 0.82);
-  filter: drop-shadow(0 0 12px rgba(255, 202, 100, 0.34));
-}
-
-.fp-node-metric.is-alert-error rect,
-.fp-topology-edge-metric.is-alert-error rect {
-  fill: rgba(100, 46, 14, 0.68);
-  stroke: rgba(255, 139, 64, 0.86);
-  filter: drop-shadow(0 0 13px rgba(255, 139, 64, 0.4));
-}
-
-.fp-node-metric.is-alert-critical rect,
-.fp-topology-edge-metric.is-alert-critical rect {
-  fill: rgba(110, 22, 52, 0.72);
-  stroke: rgba(255, 77, 120, 0.94);
-  filter: drop-shadow(0 0 16px rgba(255, 77, 120, 0.55));
-}
-
-.fp-node-metric.is-alert-warning .fp-node-metric-name,
-.fp-node-metric.is-alert-error .fp-node-metric-name,
-.fp-node-metric.is-alert-critical .fp-node-metric-name {
-  fill: #fff1d6;
-}
-
-.fp-node-metric-more rect {
-  fill: rgba(40, 184, 255, 0.2);
-  stroke: rgba(40, 184, 255, 0.5);
-}
-
-.fp-node-metric-more text {
-  text-anchor: middle;
-  fill: #76ddff;
-}
+.fp-node-metric.is-alert-info .fp-node-metric-value { fill: #a9bcff; }
+.fp-node-metric.is-alert-warning .fp-node-metric-value { fill: #ffce6b; }
+.fp-node-metric.is-alert-error .fp-node-metric-value { fill: #ff9d5e; }
+.fp-node-metric.is-alert-critical .fp-node-metric-value { fill: #ff6b95; }
 
 .fp-topology-edge-group {
   cursor: pointer;
@@ -952,44 +1016,94 @@
 }
 
 .fp-topology-edge {
-  stroke: rgba(138, 180, 226, 0.65);
+  stroke: rgba(58, 175, 255, 0.72);
   stroke-width: 2;
   fill: none;
-  marker-end: url(#fp-arrow);
+  marker-end: url(#fp-arrow-normal);
+  stroke-linecap: round;
+  stroke-linejoin: round;
   pointer-events: none;
+  filter: drop-shadow(0 0 5px rgba(40, 184, 255, 0.18));
+}
+
+.fp-topology-edge-flow {
+  fill: none;
+  stroke: rgba(106, 210, 255, 0.92);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-dasharray: 1 18;
+  stroke-dashoffset: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(40, 184, 255, 0.45));
+  animation: fp-topology-flow-light 1.8s linear infinite;
 }
 
 .fp-topology-edge-group.is-selected .fp-topology-edge {
   stroke: var(--fp-primary);
   stroke-width: 3;
+  filter: drop-shadow(0 0 10px rgba(40, 184, 255, 0.48));
 }
 
 .fp-topology-edge-group.is-alert-info .fp-topology-edge {
   stroke: rgba(142, 171, 255, 0.86);
+  marker-end: url(#fp-arrow-info);
+}
+
+.fp-topology-edge-group.is-alert-info .fp-topology-edge-flow {
+  stroke: rgba(171, 191, 255, 0.94);
+  filter: drop-shadow(0 0 8px rgba(142, 171, 255, 0.48));
 }
 
 .fp-topology-edge-group.is-alert-warning .fp-topology-edge {
   stroke: rgba(255, 202, 100, 0.92);
-  stroke-width: 3;
+  stroke-width: 2.6;
+  stroke-dasharray: 8 6;
+  marker-end: url(#fp-arrow-warning);
   filter: drop-shadow(0 0 8px rgba(255, 202, 100, 0.42));
+}
+
+.fp-topology-edge-group.is-alert-warning .fp-topology-edge-flow {
+  stroke: rgba(255, 214, 124, 0.96);
+  filter: drop-shadow(0 0 10px rgba(255, 202, 100, 0.56));
 }
 
 .fp-topology-edge-group.is-alert-error .fp-topology-edge {
   stroke: rgba(255, 139, 64, 0.96);
-  stroke-width: 3.4;
+  stroke-width: 2.9;
+  stroke-dasharray: 9 6;
+  marker-end: url(#fp-arrow-error);
   filter: drop-shadow(0 0 10px rgba(255, 139, 64, 0.48));
+}
+
+.fp-topology-edge-group.is-alert-error .fp-topology-edge-flow {
+  stroke: rgba(255, 159, 94, 0.98);
+  filter: drop-shadow(0 0 11px rgba(255, 139, 64, 0.62));
 }
 
 .fp-topology-edge-group.is-alert-critical .fp-topology-edge {
   stroke: rgba(255, 77, 120, 0.98);
-  stroke-width: 4;
-  stroke-dasharray: 12 7;
+  stroke-width: 3;
+  stroke-dasharray: 10 7;
+  marker-end: url(#fp-arrow-critical);
   filter: drop-shadow(0 0 12px rgba(255, 77, 120, 0.62));
   animation: fp-topology-flow-danger 1.6s linear infinite;
 }
 
+.fp-topology-edge-group.is-alert-critical .fp-topology-edge-flow {
+  stroke: rgba(255, 104, 150, 1);
+  stroke-width: 3.8;
+  filter: drop-shadow(0 0 13px rgba(255, 77, 120, 0.72));
+  animation-duration: 1.15s;
+}
+
 .fp-topology-edge-group.is-alert-unknown .fp-topology-edge {
   stroke: rgba(150, 165, 190, 0.78);
+  marker-end: url(#fp-arrow-unknown);
+}
+
+.fp-topology-edge-group.is-alert-unknown .fp-topology-edge-flow {
+  stroke: rgba(180, 191, 205, 0.72);
+  filter: none;
 }
 
 .fp-topology-draft-edge {
@@ -1025,8 +1139,8 @@
 }
 
 .fp-topology-edge-label-hit {
-  fill: rgba(3, 12, 26, 0.82);
-  stroke: rgba(104, 158, 220, 0.28);
+  fill: rgba(6, 22, 45, 0.92);
+  stroke: rgba(104, 158, 220, 0.36);
   stroke-width: 1;
   cursor: pointer;
   pointer-events: all;
@@ -1036,13 +1150,6 @@
 .fp-topology-edge-group.is-selected .fp-topology-edge-label-hit {
   fill: rgba(9, 54, 92, 0.86);
   stroke: rgba(40, 184, 255, 0.72);
-}
-
-.fp-topology-edge-metric rect {
-  fill: rgba(3, 12, 26, 0.86);
-  stroke: rgba(40, 184, 255, 0.34);
-  stroke-width: 1;
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.26));
 }
 
 .fp-topology-edge-metric text {
@@ -1056,12 +1163,21 @@
   pointer-events: none;
 }
 
+.fp-topology-edge-metric.is-alert-info text { fill: #a9bcff; }
+.fp-topology-edge-metric.is-alert-warning text { fill: #ffce6b; }
+.fp-topology-edge-metric.is-alert-error text { fill: #ff9d5e; }
+.fp-topology-edge-metric.is-alert-critical text { fill: #ff6b95; }
+
 @keyframes fp-topology-critical-pulse {
   0%, 100% { stroke-width: 2.2; opacity: 1; }
   50% { stroke-width: 3.4; opacity: .82; }
 }
 
 @keyframes fp-topology-flow-danger {
+  to { stroke-dashoffset: -38; }
+}
+
+@keyframes fp-topology-flow-light {
   to { stroke-dashoffset: -38; }
 }
 
@@ -1388,6 +1504,21 @@
   opacity: .78;
 }
 
+.fp-topology-metric-card.is-alert-warning {
+  border-color: rgba(255, 202, 100, 0.7);
+  box-shadow: inset 3px 0 0 rgba(255, 202, 100, 0.8);
+}
+
+.fp-topology-metric-card.is-alert-error {
+  border-color: rgba(255, 139, 64, 0.76);
+  box-shadow: inset 3px 0 0 rgba(255, 139, 64, 0.85);
+}
+
+.fp-topology-metric-card.is-alert-critical {
+  border-color: rgba(255, 77, 120, 0.86);
+  box-shadow: inset 3px 0 0 rgba(255, 77, 120, 0.9), 0 0 16px rgba(255, 77, 120, 0.14);
+}
+
 .fp-topology-metric-card__main {
   display: grid;
   gap: 4px;
@@ -1426,6 +1557,11 @@
 
 .fp-topology-metric-card small {
   grid-column: 1 / -1;
+}
+
+.fp-topology-metric-display-line {
+  color: #73b9ee !important;
+  font-size: 11px !important;
 }
 
 .fp-topology-metric-runtime {
@@ -1592,6 +1728,11 @@
 .fp-topology-metric-card em.is-ready {
   color: #67f6aa;
   background: rgba(36, 214, 134, 0.12);
+}
+
+.fp-topology-metric-card em.is-alert {
+  color: #ffebf1;
+  background: rgba(255, 77, 120, 0.26);
 }
 
 .fp-switch-field {
@@ -1824,6 +1965,60 @@
 .fp-topology-alert-empty span {
   font-size: 12px;
   line-height: 1.65;
+}
+
+.fp-topology-alert-list {
+  display: grid;
+  gap: 10px;
+}
+
+.fp-topology-alert-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(104, 158, 220, 0.2);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(5, 18, 39, 0.72);
+}
+
+.fp-topology-alert-item div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fp-topology-alert-item strong {
+  color: #f4fbff;
+}
+
+.fp-topology-alert-item span {
+  overflow: hidden;
+  color: #9eb8d7;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-topology-alert-item em {
+  color: #8fb0d2;
+  font-size: 12px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.fp-topology-alert-item.is-alert-warning {
+  border-color: rgba(255, 202, 100, 0.6);
+}
+
+.fp-topology-alert-item.is-alert-error {
+  border-color: rgba(255, 139, 64, 0.7);
+}
+
+.fp-topology-alert-item.is-alert-critical {
+  border-color: rgba(255, 77, 120, 0.82);
+  box-shadow: 0 0 14px rgba(255, 77, 120, 0.14);
 }
 
 .fp-topology-monitor-card {

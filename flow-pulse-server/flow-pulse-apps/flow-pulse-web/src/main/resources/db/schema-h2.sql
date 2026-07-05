@@ -321,6 +321,9 @@ create table if not exists fp_resource_metric_config (
     interval_sec int not null,
     parameter_json clob,
     parameter_signature varchar(64) not null default '',
+    show_on_topology boolean not null default true,
+    display_name varchar(64),
+    display_order int not null default 100,
     enabled boolean not null,
     task_status varchar(32) not null,
     last_collect_status varchar(32) not null,
@@ -335,8 +338,13 @@ create table if not exists fp_resource_metric_config (
 drop index if exists uk_fp_resource_metric_config_object;
 
 alter table fp_resource_metric_config add column if not exists parameter_signature varchar(64) not null default '';
+alter table fp_resource_metric_config add column if not exists show_on_topology boolean not null default true;
+alter table fp_resource_metric_config add column if not exists display_name varchar(64);
+alter table fp_resource_metric_config add column if not exists display_order int not null default 100;
 update fp_resource_metric_config set parameter_signature = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 where parameter_signature is null or parameter_signature = '';
+update fp_resource_metric_config set show_on_topology = true where show_on_topology is null;
+update fp_resource_metric_config set display_order = 100 where display_order is null;
 
 create unique index if not exists uk_fp_resource_metric_config_object
     on fp_resource_metric_config(tenant_id, object_type, object_id, metric_definition_id, parameter_signature);

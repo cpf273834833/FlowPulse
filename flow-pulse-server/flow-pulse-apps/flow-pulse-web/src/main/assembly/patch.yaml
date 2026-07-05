@@ -1,0 +1,11 @@
+# 发布时间
+release_time: 2026-07-06
+
+# 模块包描述信息
+description:
+    - 补丁包描述
+
+target_modules:
+    - name: flowpulse-main
+      current_module_version: 2.0.18.60.0
+      patched_module_version: 2.0.18.60.1

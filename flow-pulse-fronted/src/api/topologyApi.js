@@ -20,6 +20,9 @@ export const topologyApi = {
   detail(id) {
     return get(`${BASE}/${id}`);
   },
+  runtime(id) {
+    return get(`${BASE}/${id}/runtime`);
+  },
   create(data) {
     return post(BASE, data);
   },

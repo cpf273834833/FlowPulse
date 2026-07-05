@@ -3,6 +3,7 @@
           xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 http://maven.apache.org/xsd/assembly-2.2.0.xsd">
     <id>omp</id>
     <formats>
+        <format>dir</format>
         <format>tar.gz</format>
     </formats>
     <includeBaseDirectory>false</includeBaseDirectory>
@@ -11,6 +12,10 @@
             <outputDirectory>flowpulse-main/lib</outputDirectory>
             <useProjectArtifact>true</useProjectArtifact>
             <scope>runtime</scope>
+            <excludes>
+                <exclude>org.projectlombok:lombok</exclude>
+                <exclude>uyun.whale:util-shell</exclude>
+            </excludes>
         </dependencySet>
     </dependencySets>
     <fileSets>
@@ -23,6 +28,17 @@
                 <include>*.sh</include>
             </includes>
         </fileSet>
+
+        <fileSet>
+            <directory>target/util-shell</directory>
+            <outputDirectory>flowpulse-main/bin</outputDirectory>
+            <fileMode>755</fileMode>
+            <lineEnding>unix</lineEnding>
+            <includes>
+                <include>*</include>
+            </includes>
+        </fileSet>
+
         <fileSet>
             <directory>src/main/resources</directory>
             <outputDirectory>flowpulse-main/config</outputDirectory>
@@ -30,8 +46,48 @@
                 <include>application*.yml</include>
             </includes>
         </fileSet>
+        <!-- config/ 额外模板文件 -->
         <fileSet>
-            <directory>../../flow-pulse-fronted/build</directory>
+            <directory>src/main/resources/config</directory>
+            <outputDirectory>flowpulse-main/config</outputDirectory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </fileSet>
+
+        <fileSet>
+            <directory>src/main/resources/db</directory>
+            <outputDirectory>flowpulse-main/config/db</outputDirectory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </fileSet>
+
+        <fileSet>
+            <directory>src/main/resources/i18n</directory>
+            <outputDirectory>flowpulse-main/config/i18n</outputDirectory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </fileSet>
+
+        <fileSet>
+            <directory>data</directory>
+            <outputDirectory>flowpulse-main/data</outputDirectory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </fileSet>
+
+        <fileSet>
+            <directory>src/main/resources</directory>
+            <outputDirectory>flowpulse-main</outputDirectory>
+            <includes>
+                <include>bootstrap.yml</include>
+            </includes>
+        </fileSet>
+        <fileSet>
+            <directory>D:\codex\FlowPulse\flow-pulse-fronted\build</directory>
             <outputDirectory>flowpulse-main/static</outputDirectory>
         </fileSet>
     </fileSets>

@@ -6,22 +6,29 @@ import { logicalObjectApi } from '../../api/logicalObjectApi';
 import { metricApi } from '../../api/metricApi';
 import { executorNodeApi } from '../../api/executorNodeApi';
 import { thresholdApi } from '../../api/thresholdApi';
-import { alertApi } from '../../api/alertApi';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
 import Toast from '../../components/Toast';
 import { ElementEditor } from './TopologyInspector';
+import kafkaIcon from '../../assets/icons/kafka.png';
+import sparkIcon from '../../assets/icons/spark.png';
+import elasticsearchIcon from '../../assets/icons/elasticsearch.png';
+import applicationIcon from '../../assets/icons/application.png';
 import './DataTopologyPage.css';
 
 const DEFAULT_QUERY = { pageNo: 1, pageSize: 10, keyword: '' };
 const DEFAULT_FORM = { topologyCode: '', topologyName: '', envId: '', description: '', canvasConfigJson: '{}' };
 const NODE_SIZE = { width: 238, height: 104 };
-const DEFAULT_VIEWBOX = { x: 0, y: 0, width: 1200, height: 620 };
+const DEFAULT_VIEWBOX = { x: 0, y: 0, width: 980, height: 560 };
 const EMPTY_CONFIG_PAGE = { configs: { records: [], total: 0, pageNo: 1, pageSize: 20 }, stats: [] };
+const GRID_SIZE = 20;
+const ALIGN_THRESHOLD = 8;
+const TOPOLOGY_FIT_DEBUG = true;
 
 
 export default function DataTopologyPage() {
   const svgRef = useRef(null);
+  const userAdjustedCanvasRef = useRef(false);
   const [query, setQuery] = useState(DEFAULT_QUERY);
   const [page, setPage] = useState({ records: [], total: 0, pageNo: 1, pageSize: 10 });
   const [stats, setStats] = useState([]);
@@ -36,9 +43,11 @@ export default function DataTopologyPage() {
   const [resourceKeyword, setResourceKeyword] = useState('');
   const [resourceCategory, setResourceCategory] = useState('ALL');
   const [resourceType, setResourceType] = useState('');
+  const [resourcePage, setResourcePage] = useState({ pageNo: 1, pageSize: 30 });
   const [selected, setSelected] = useState(null);
   const [dragging, setDragging] = useState(null);
   const [panning, setPanning] = useState(null);
+  const [alignmentGuide, setAlignmentGuide] = useState(null);
   const [canvasViewBox, setCanvasViewBox] = useState(DEFAULT_VIEWBOX);
   const [edgeDraft, setEdgeDraft] = useState(null);
   const [inspectorTab, setInspectorTab] = useState('properties');
@@ -51,6 +60,7 @@ export default function DataTopologyPage() {
   const [topologyMetricConfigs, setTopologyMetricConfigs] = useState([]);
   const [topologyAlerts, setTopologyAlerts] = useState([]);
   const [showCanvasMetrics, setShowCanvasMetrics] = useState(false);
+  const [showEdgeLabels, setShowEdgeLabels] = useState(false);
   const [canvasFullscreen, setCanvasFullscreen] = useState(false);
   const [screenFullscreen, setScreenFullscreen] = useState(false);
   const [metricDraft, setMetricDraft] = useState(null);
@@ -88,6 +98,10 @@ export default function DataTopologyPage() {
     });
   }, [resources, resourceKeyword, resourceCategory, resourceType]);
   const resourceTypes = useMemo(() => Array.from(new Set(resources.map((item) => item.resourceType || item.infrastructureType).filter(Boolean))).sort(), [resources]);
+  const pagedResources = useMemo(() => {
+    const start = (resourcePage.pageNo - 1) * resourcePage.pageSize;
+    return filteredResources.slice(start, start + resourcePage.pageSize);
+  }, [filteredResources, resourcePage]);
   const selectedContext = useMemo(() => selectedElementContext(), [current, selected]);
 
   useEffect(() => {
@@ -106,6 +120,10 @@ export default function DataTopologyPage() {
   }, []);
 
   useEffect(() => {
+    setResourcePage((value) => ({ ...value, pageNo: 1 }));
+  }, [resourceKeyword, resourceCategory, resourceType]);
+
+  useEffect(() => {
     function syncFullscreen() {
       setScreenFullscreen(Boolean(document.fullscreenElement));
     }
@@ -120,6 +138,45 @@ export default function DataTopologyPage() {
     }, 10000);
     return () => window.clearInterval(timer);
   }, [mode, current?.id, nodes, edges]);
+
+  useEffect(() => {
+    if (mode !== 'canvas' || !current || !nodes.length) return undefined;
+    userAdjustedCanvasRef.current = false;
+    const timers = [0, 80, 220, 420].map((delay) => window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        const skipped = userAdjustedCanvasRef.current;
+        debugTopologyFit('initial-fit-timer', {
+          delay,
+          skipped,
+          mode,
+          topologyId: current?.id,
+          nodeCount: nodes.length,
+          showCanvasMetrics,
+          svgRect: readSvgRect(svgRef.current),
+        });
+        if (userAdjustedCanvasRef.current) return;
+        setCanvasViewBox(fitTopologyViewBox(nodes, showCanvasMetrics, { mode: 'initial', svg: svgRef.current, reason: `initial-${delay}` }));
+      });
+    }, delay));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [mode, current?.id, nodes.length, showCanvasMetrics]);
+
+  useEffect(() => {
+    if (mode !== 'canvas' || !current || !nodes.length) return undefined;
+    const onResize = () => {
+      debugTopologyFit('resize-fit', {
+        skipped: userAdjustedCanvasRef.current,
+        topologyId: current?.id,
+        nodeCount: nodes.length,
+        showCanvasMetrics,
+        svgRect: readSvgRect(svgRef.current),
+      });
+      if (userAdjustedCanvasRef.current) return;
+      setCanvasViewBox(fitTopologyViewBox(nodes, showCanvasMetrics, { mode: 'initial', svg: svgRef.current, reason: 'resize' }));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [mode, current?.id, nodes.length, showCanvasMetrics]);
 
   useEffect(() => {
     setInspectorTab('properties');
@@ -189,7 +246,8 @@ export default function DataTopologyPage() {
       setNodes(nextNodes);
       setEdges(nextEdges);
       setSelected(null);
-      setCanvasViewBox(DEFAULT_VIEWBOX);
+      userAdjustedCanvasRef.current = false;
+      setCanvasViewBox(fitTopologyViewBox(nextNodes, showCanvasMetrics, { mode: 'initial', svg: svgRef.current, reason: 'open-topology' }));
       cancelEdgeDraft();
       await loadTopologyRuntime(response.topology, nextNodes, nextEdges);
     } catch (error) {
@@ -200,14 +258,10 @@ export default function DataTopologyPage() {
   async function loadTopologyRuntime(topology = current, nextNodes = nodes, nextEdges = edges) {
     if (!topology) return;
     try {
-      const [configResponse, alertResponse] = await Promise.all([
-        metricApi.resourceConfigPage({ pageNo: 1, pageSize: 1000, enabled: 'true' }),
-        alertApi.page({ pageNo: 1, pageSize: 1000, topologyId: topology.id, status: 'ACTIVE' }),
-      ]);
-      const contexts = topologyElementRuntimeKeys(nextNodes, nextEdges);
-      const records = ((configResponse || {}).configs || {}).records || [];
-      setTopologyMetricConfigs(records.filter((config) => contexts.has(runtimeKey(config.objectType, config.objectId))));
-      setTopologyAlerts(((alertResponse || {}).alerts || {}).records || []);
+      const response = await topologyApi.runtime(topology.id);
+      const runtime = normalizeTopologyRuntime(response, nextNodes, nextEdges);
+      setTopologyMetricConfigs(runtime.configs);
+      setTopologyAlerts(runtime.alerts);
     } catch (error) {
       setTopologyMetricConfigs([]);
       setTopologyAlerts([]);
@@ -267,8 +321,8 @@ export default function DataTopologyPage() {
       }));
       const resourcePages = await Promise.all(infrastructures.map(async (infra) => {
         try {
-          const data = await infrastructureApi.resources(infra.id, { pageNo: 1, pageSize: 500 });
-          return (((data || {}).records || [])).map((resource) => ({
+          const records = await loadAllInfrastructureResources(infra.id);
+          return records.map((resource) => ({
             ...resource,
             infrastructureId: infra.id,
             infrastructureName: infra.name,
@@ -293,6 +347,21 @@ export default function DataTopologyPage() {
       setResources([]);
       showError('资源加载失败', error);
     }
+  }
+
+  async function loadAllInfrastructureResources(infrastructureId) {
+    const pageSize = 200;
+    let pageNo = 1;
+    let records = [];
+    let total = 0;
+    do {
+      const data = await infrastructureApi.resources(infrastructureId, { pageNo, pageSize });
+      const pageRecords = ((data || {}).records || []);
+      total = Number((data || {}).total || pageRecords.length);
+      records = records.concat(pageRecords);
+      pageNo += 1;
+    } while (records.length < total && pageNo <= 50);
+    return records;
   }
 
   function openCreate() {
@@ -504,6 +573,7 @@ export default function DataTopologyPage() {
       setEdgeDraft((draft) => (draft ? { ...draft, pointer: svgPoint(event) } : draft));
     }
     if (panning) {
+      userAdjustedCanvasRef.current = true;
       const svg = svgRef.current;
       if (!svg) return;
       const rect = svg.getBoundingClientRect();
@@ -517,9 +587,19 @@ export default function DataTopologyPage() {
       return;
     }
     if (!dragging) return;
+    userAdjustedCanvasRef.current = true;
     const point = svgPoint(event);
-    const nextX = clamp(point.x - dragging.offsetX, canvasViewBox.x + 20, canvasViewBox.x + canvasViewBox.width - NODE_SIZE.width - 20);
-    const nextY = clamp(point.y - dragging.offsetY, canvasViewBox.y + 20, canvasViewBox.y + canvasViewBox.height - NODE_SIZE.height - 20);
+    const snapped = snapNodePosition(
+      point.x - dragging.offsetX,
+      point.y - dragging.offsetY,
+      dragging.nodeId,
+      nodes,
+      topologyNodeVisualSize(showCanvasMetrics),
+      canvasViewBox,
+    );
+    const nextX = snapped.x;
+    const nextY = snapped.y;
+    setAlignmentGuide(snapped.guides);
     setNodes((items) => items.map((node) => (node.id === dragging.nodeId ? { ...node, x: nextX, y: nextY } : node)));
     setSelected((currentValue) => {
       if (!currentValue || currentValue.type !== 'node' || currentValue.data.id !== dragging.nodeId) return currentValue;
@@ -530,12 +610,14 @@ export default function DataTopologyPage() {
   function endDrag() {
     setDragging(null);
     setPanning(null);
+    setAlignmentGuide(null);
   }
 
   function zoomCanvas(factor, anchorPoint = null) {
+    userAdjustedCanvasRef.current = true;
     setCanvasViewBox((viewBox) => {
-      const nextWidth = clamp(viewBox.width * factor, 480, 2600);
-      const nextHeight = clamp(viewBox.height * factor, 248, 1344);
+      const nextWidth = Math.max(viewBox.width * factor, 480);
+      const nextHeight = Math.max(viewBox.height * factor, 248);
       const anchor = anchorPoint || {
         x: viewBox.x + viewBox.width / 2,
         y: viewBox.y + viewBox.height / 2,
@@ -552,7 +634,30 @@ export default function DataTopologyPage() {
   }
 
   function resetCanvasView() {
-    setCanvasViewBox(DEFAULT_VIEWBOX);
+    userAdjustedCanvasRef.current = false;
+    debugTopologyFit('manual-reset-fit', {
+      nodeCount: nodes.length,
+      showCanvasMetrics,
+      svgRect: readSvgRect(svgRef.current),
+    });
+    setCanvasViewBox(fitTopologyViewBox(nodes, showCanvasMetrics, { mode: 'reset', svg: svgRef.current, reason: 'manual-reset' }));
+  }
+
+  function toggleCanvasMetrics() {
+    setShowCanvasMetrics((value) => {
+      const next = !value;
+      userAdjustedCanvasRef.current = false;
+      setCanvasViewBox((viewBox) => {
+        debugTopologyFit('toggle-metric-fit', {
+          from: value,
+          to: next,
+          currentViewBox: viewBox,
+          svgRect: readSvgRect(svgRef.current),
+        });
+        return fitTopologyViewBox(nodes, next, { mode: 'preserveOrigin', currentViewBox: viewBox, svg: svgRef.current, reason: 'toggle-metrics' });
+      });
+      return next;
+    });
   }
 
   function handleCanvasWheel(event) {
@@ -810,7 +915,7 @@ export default function DataTopologyPage() {
 
   if (mode === 'canvas') {
     return (
-      <div className={`fp-page fp-topology-page fp-topology-editor-page ${canvasFullscreen ? 'is-canvas-fullscreen' : ''}`}>
+      <div className={`fp-page fp-topology-page fp-topology-editor-page ${canvasFullscreen ? 'is-canvas-fullscreen' : ''} ${screenFullscreen ? 'is-screen-fullscreen' : ''}`}>
         <header className="fp-topology-canvas-header">
           <button className="fp-link-button fp-back-link" type="button" onClick={backToList}>返回拓扑列表</button>
           <div className="fp-topology-canvas-title">
@@ -821,8 +926,6 @@ export default function DataTopologyPage() {
           <div className="fp-actions">
             <button className="fp-button" type="button" onClick={openEdit} disabled={!current}>编辑信息</button>
             <button className="fp-button" type="button" onClick={deleteSelected} disabled={!selected}>删除元素</button>
-            <button className="fp-button" type="button" onClick={() => setCanvasFullscreen((value) => !value)} disabled={!current}>{canvasFullscreen ? '退出全屏' : '全屏看图'}</button>
-            <button className="fp-button" type="button" onClick={toggleScreenFullscreen} disabled={!current}>{screenFullscreen ? '退出投屏' : '投屏全屏'}</button>
             <button className="fp-button fp-button--primary" type="button" onClick={saveCanvas} disabled={!current}>保存画布</button>
             <button className="fp-button fp-button--danger" type="button" onClick={requestDelete} disabled={!current}>删除拓扑</button>
           </div>
@@ -834,20 +937,15 @@ export default function DataTopologyPage() {
               {!current ? <EmptyCanvas title="请选择或新增拓扑" desc="拓扑创建后，就可以从右侧资源池添加节点并维护连线。" /> : null}
               {current && nodes.length === 0 ? <EmptyCanvas title="从右侧添加第一个节点" desc="建议先添加 Kafka Topic、Spark 作业、ES Index 等真实资源。" /> : null}
               <div className="fp-canvas-view-toolbar">
-                <button
-                  className={showCanvasMetrics ? 'is-active' : ''}
-                  type="button"
-                  onClick={() => setShowCanvasMetrics((value) => !value)}
-                >
-                  显示指标
-                </button>
+                <button title="显示指标" className={showCanvasMetrics ? 'is-active' : ''} type="button" onClick={toggleCanvasMetrics}>指标</button>
+                <button title="显示连线名称" className={showEdgeLabels ? 'is-active' : ''} type="button" onClick={() => setShowEdgeLabels((value) => !value)}>线名</button>
+                <button title={canvasFullscreen ? '退出全屏看图' : '全屏看图'} type="button" onClick={() => setCanvasFullscreen((value) => !value)}>{canvasFullscreen ? '退出' : '适屏'}</button>
+                <button title={screenFullscreen ? '退出投屏全屏' : '投屏全屏'} type="button" onClick={toggleScreenFullscreen}>{screenFullscreen ? '退出' : '投屏'}</button>
+                <button title="缩小" type="button" onClick={() => zoomCanvas(1.18)}>−</button>
+                <strong>{Math.round((DEFAULT_VIEWBOX.width / canvasViewBox.width) * 100)}%</strong>
+                <button title="放大" type="button" onClick={() => zoomCanvas(0.85)}>＋</button>
+                <button title="重置视图" type="button" onClick={resetCanvasView}>↻</button>
                 <span>{canvasRuntime.alertCount > 0 ? `${canvasRuntime.alertCount} 个告警元素` : '无活动告警'}</span>
-              </div>
-              <div className="fp-canvas-controls">
-                <button type="button" onClick={() => zoomCanvas(0.85)}>＋</button>
-                <span>{Math.round((DEFAULT_VIEWBOX.width / canvasViewBox.width) * 100)}%</span>
-                <button type="button" onClick={() => zoomCanvas(1.18)}>－</button>
-                <button type="button" onClick={resetCanvasView}>重置</button>
               </div>
               <svg
                 ref={svgRef}
@@ -859,9 +957,22 @@ export default function DataTopologyPage() {
                 onMouseLeave={endDrag}
                 onWheel={handleCanvasWheel}
               >
-                <defs><marker id="fp-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="rgba(138,180,226,.78)" /></marker></defs>
-                {edges.map((edge) => <Edge key={edge.id} edge={edge} nodeMap={nodeMap} runtime={canvasRuntime.byElementId[edge.id]} showMetrics={showCanvasMetrics} selected={selected?.type === 'edge' && selected.data.id === edge.id} onSelect={(event) => { event.stopPropagation(); setSelected({ type: 'edge', data: edge }); cancelEdgeDraft(); }} />)}
+                <defs>
+                  <linearGradient id="fp-node-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="rgba(13, 50, 86, 0.98)" />
+                    <stop offset="52%" stopColor="rgba(7, 29, 58, 0.98)" />
+                    <stop offset="100%" stopColor="rgba(5, 18, 38, 0.98)" />
+                  </linearGradient>
+                  <marker id="fp-arrow-normal" markerWidth="14" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L12,6 L1,11 L4,6 z" fill="rgba(58,175,255,.88)" /></marker>
+                  <marker id="fp-arrow-info" markerWidth="14" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L12,6 L1,11 L4,6 z" fill="rgba(142,171,255,.92)" /></marker>
+                  <marker id="fp-arrow-warning" markerWidth="14" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L12,6 L1,11 L4,6 z" fill="rgba(255,202,100,.95)" /></marker>
+                  <marker id="fp-arrow-error" markerWidth="14" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L12,6 L1,11 L4,6 z" fill="rgba(255,139,64,.96)" /></marker>
+                  <marker id="fp-arrow-critical" markerWidth="14" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L12,6 L1,11 L4,6 z" fill="rgba(255,77,120,.98)" /></marker>
+                  <marker id="fp-arrow-unknown" markerWidth="14" markerHeight="12" refX="11" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M1,1 L12,6 L1,11 L4,6 z" fill="rgba(150,165,190,.9)" /></marker>
+                </defs>
+                {edges.map((edge) => <Edge key={edge.id} edge={edge} nodeMap={nodeMap} runtime={canvasRuntime.byElementId[edge.id]} showMetrics={showCanvasMetrics} showLabel={showEdgeLabels} selected={selected?.type === 'edge' && selected.data.id === edge.id} onSelect={(event) => { event.stopPropagation(); setSelected({ type: 'edge', data: edge }); cancelEdgeDraft(); }} />)}
                 {edgeDraft ? <DraftEdge draft={edgeDraft} nodeMap={nodeMap} /> : null}
+                <AlignmentGuides guides={alignmentGuide} viewBox={canvasViewBox} />
                 {nodes.map((node) => (
                   <Node
                     key={node.id}
@@ -886,6 +997,7 @@ export default function DataTopologyPage() {
                   selected={selected}
                   nodes={nodes}
                   context={selectedContext}
+                  alerts={topologyAlerts.filter((alert) => alert.topologyElementId === selected.data.id)}
                   activeTab={inspectorTab}
                   metrics={applicableMetrics}
                   implementations={metricImplementations}
@@ -910,7 +1022,9 @@ export default function DataTopologyPage() {
               <ResourcePanel
                 current={current}
                 resources={filteredResources}
+                pageResources={pagedResources}
                 allResources={resources}
+                resourcePage={resourcePage}
                 category={resourceCategory}
                 type={resourceType}
                 types={resourceTypes}
@@ -919,6 +1033,7 @@ export default function DataTopologyPage() {
                 onCategoryChange={setResourceCategory}
                 onTypeChange={setResourceType}
                 onKeywordChange={setResourceKeyword}
+                onResourcePageChange={setResourcePage}
                 onAddManual={addManualNode}
                 onAddResource={addResourceNode}
               />
@@ -980,7 +1095,9 @@ export default function DataTopologyPage() {
 function ResourcePanel({
   current,
   resources,
+  pageResources,
   allResources,
+  resourcePage,
   category,
   type,
   types,
@@ -989,6 +1106,7 @@ function ResourcePanel({
   onCategoryChange,
   onTypeChange,
   onKeywordChange,
+  onResourcePageChange,
   onAddManual,
   onAddResource,
 }) {
@@ -1012,7 +1130,7 @@ function ResourcePanel({
       </select>
       <button className="fp-button fp-button--wide" type="button" onClick={onAddManual} disabled={!current}>新增手工节点</button>
       <div className="fp-topology-resource-list">
-        {resources.map((resource) => (
+        {pageResources.map((resource) => (
           <button className="fp-topology-resource" type="button" key={`${resource.infrastructureId}-${resource.id}`} disabled={!current || usedObjectIds.has(resource.id)} onClick={() => onAddResource(resource)}>
             <strong>{resource.resourceName || resource.resourceCode}</strong>
             <span>{resource.isLogicalObject ? '逻辑对象' : '物理对象'} · {resource.resourceType} / {resource.infrastructureName}</span>
@@ -1020,6 +1138,14 @@ function ResourcePanel({
         ))}
         {resources.length === 0 ? <div className="fp-empty">暂无可选资源</div> : null}
       </div>
+      {resources.length > resourcePage.pageSize ? (
+        <Pagination
+          pageNo={resourcePage.pageNo}
+          pageSize={resourcePage.pageSize}
+          total={resources.length}
+          onChange={(next) => onResourcePageChange({ ...resourcePage, ...next })}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1075,7 +1201,7 @@ function TopologyCardGrid({ page, envs, onOpen, onEdit }) {
       {page.records.map((topology) => {
         const env = envs.find((item) => item.id === topology.envId);
         return (
-          <article className="fp-topology-card" key={topology.id}>
+          <article className={`fp-topology-card ${severityClass(topology.alertLevel || 'NORMAL')}`} key={topology.id}>
             <button className="fp-topology-card__main" type="button" onClick={() => onOpen(topology)}>
               <div className="fp-topology-card__head">
                 <div>
@@ -1172,78 +1298,125 @@ function MiniStat({ stat }) {
 
 function Node({ node, runtime, showMetrics, selected, linking, onMouseDown, onContextMenu }) {
   const level = runtime?.level || node.alertLevel || 'NORMAL';
-  const metrics = (runtime?.metrics || []).slice(0, 2);
-  const moreCount = Math.max((runtime?.metrics || []).length - metrics.length, 0);
+  const metrics = (runtime?.metrics || []).slice(0, 3);
+  const icon = topologyIcon(node.objectType);
+  const size = topologyNodeVisualSize(showMetrics, runtime);
+  const metricWidth = metrics.length ? (size.width - 36) / metrics.length : 0;
+  const metricTop = size.height - 64;
   return (
     <g className={`fp-topology-node ${selected ? 'is-selected' : ''} ${linking ? 'is-linking' : ''} ${severityClass(level)}`} onMouseDown={onMouseDown} onContextMenu={onContextMenu}>
       <title>{runtimeTooltip(node.nodeName, runtime)}</title>
-      <rect x={node.x} y={node.y} width={node.width} height={node.height} rx="18" />
-      <circle className="fp-topology-status-dot" cx={node.x + node.width - 22} cy={node.y + 22} r="5" />
-      <text x={node.x + 18} y={node.y + 36}>{node.nodeName}</text>
-      <text className="fp-node-sub" x={node.x + 18} y={node.y + 62}>{objectTypeText(node.objectType)} / {alertText(level)}</text>
+      <rect className="fp-topology-node-card" x={node.x} y={node.y} width={size.width} height={size.height} rx="16" />
+      {icon ? <image className="fp-topology-node-icon" href={icon} x={node.x + 22} y={node.y + 22} width="28" height="28" /> : null}
+      <g className={`fp-node-status ${severityClass(level)}`} transform={`translate(${node.x + size.width - 72}, ${node.y + 18})`}>
+        <rect width="50" height="22" rx="11" />
+        <text x="25" y="15">{alertText(level)}</text>
+      </g>
+      <text className="fp-node-title" x={node.x + 22} y={node.y + 78}>{nodeNameText(node.nodeName)}</text>
+      <text className="fp-node-sub" x={node.x + 22} y={node.y + 104}>{objectTypeText(node.objectType)}</text>
+      <line className="fp-node-divider" x1={node.x + 22} y1={node.y + 124} x2={node.x + size.width - 22} y2={node.y + 124} />
       {showMetrics ? (
         <g className="fp-node-metrics">
           {metrics.map((metric, index) => (
-            <g className={`fp-node-metric ${severityClass(metric.alertLevel || 'NORMAL')}`} key={metric.id || metric.metricCode || index} transform={`translate(${node.x + 14}, ${node.y + node.height + 8 + index * 28})`}>
+            <g className={`fp-node-metric ${severityClass(metric.alertLevel || 'NORMAL')}`} key={metric.id || metric.metricCode || index} transform={`translate(${node.x + 18 + index * metricWidth}, ${node.y + metricTop})`}>
               <title>{`${metric.metricName || metric.metricCode}：${metricValueText(metric)} / ${alertText(metric.alertLevel || 'NORMAL')}`}</title>
-              <rect width={node.width - 28} height="24" rx="12" />
-              <text className="fp-node-metric-name" x="10" y="16">{metricNameText(metric)}</text>
-              <text className="fp-node-metric-value" x={node.width - 38} y="16">{metricValueText(metric)}</text>
+              <text className="fp-node-metric-name" x="8" y="18">{metricNameText(metric)}</text>
+              <text className="fp-node-metric-value" x="8" y="40">{metricCanvasValueText(metric)}</text>
             </g>
           ))}
-          {moreCount > 0 ? (
-            <g className="fp-node-metric-more" transform={`translate(${node.x + node.width - 56}, ${node.y + node.height + 8 + metrics.length * 28})`}>
-              <rect width="42" height="22" rx="11" />
-              <text x="21" y="15">+{moreCount}</text>
-            </g>
-          ) : null}
         </g>
       ) : null}
     </g>
   );
 }
 
-function Edge({ edge, nodeMap, runtime, showMetrics, selected, onSelect }) {
+function Edge({ edge, nodeMap, runtime, showMetrics, showLabel, selected, onSelect }) {
   const source = nodeMap[edge.sourceNodeId];
   const target = nodeMap[edge.targetNodeId];
   if (!source || !target) return null;
   const level = runtime?.level || edge.alertLevel || 'NORMAL';
-  const x1 = source.x + source.width;
-  const y1 = source.y + source.height / 2;
-  const x2 = target.x;
-  const y2 = target.y + target.height / 2;
+  const sourceSize = topologyNodeVisualSize(showMetrics);
+  const targetSize = topologyNodeVisualSize(showMetrics);
+  const anchors = edgeAnchors(source, target, sourceSize, targetSize);
+  const { x1, y1, x2, y2, orientation } = anchors;
+  const distance = orientation === 'horizontal' ? Math.abs(x2 - x1) : Math.abs(y2 - y1);
+  const curve = clamp(distance * 0.42, 64, 150);
+  const c1 = orientation === 'horizontal' ? x1 + curve * anchors.direction : x1;
+  const c1y = orientation === 'horizontal' ? y1 : y1 + curve * anchors.direction;
+  const c2 = orientation === 'horizontal' ? x2 - curve * anchors.direction : x2;
+  const c2y = orientation === 'horizontal' ? y2 : y2 - curve * anchors.direction;
   const mid = (x1 + x2) / 2;
-  const path = `M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}`;
+  const midY = (y1 + y2) / 2;
+  const path = `M${x1},${y1} C${c1},${c1y} ${c2},${c2y} ${x2},${y2}`;
   const label = edge.edgeName || edge.edgeKey || '连线';
   const labelWidth = clamp(label.length * 13 + 28, 72, 180);
-  const labelY = (y1 + y2) / 2 - 8;
+  const labelX = mid;
+  const labelY = midY - 10;
   const metric = (runtime?.metrics || [])[0];
-  const moreCount = Math.max((runtime?.metrics || []).length - 1, 0);
-  const metricLabel = metric ? `${metricNameText(metric)} ${metricValueText(metric)}${moreCount ? ` +${moreCount}` : ''}` : '';
-  const metricWidth = clamp(metricLabel.length * 8 + 28, 120, 240);
+  const metricLabel = metric ? `${metricNameText(metric)} ${metricCanvasValueText(metric)}` : '';
+  const metricWidth = clamp(metricLabel.length * 8 + 34, 132, 230);
   return (
     <g className={`fp-topology-edge-group ${selected ? 'is-selected' : ''} ${severityClass(level)}`} onMouseDown={onSelect} onClick={onSelect}>
       <title>{runtimeTooltip(label, runtime)}</title>
       <path className="fp-topology-edge-hit" d={path} />
       <path className="fp-topology-edge" d={path} />
-      <rect className="fp-topology-edge-label-hit" x={mid - labelWidth / 2} y={labelY - 19} width={labelWidth} height="26" rx="13" />
-      <text className="fp-topology-edge-label" x={mid} y={labelY}>{label}</text>
+      <path className="fp-topology-edge-flow" d={path} />
+      {showLabel ? (
+        <>
+          <rect className="fp-topology-edge-label-hit" x={labelX - labelWidth / 2} y={labelY - 19} width={labelWidth} height="26" rx="13" />
+          <text className="fp-topology-edge-label" x={labelX} y={labelY}>{label}</text>
+        </>
+      ) : null}
       {showMetrics && metric ? (
         <g className={`fp-topology-edge-metric ${severityClass(metric.alertLevel || 'NORMAL')}`}>
           <title>{`${metric.metricName || metric.metricCode}：${metricValueText(metric)} / ${alertText(metric.alertLevel || 'NORMAL')}`}</title>
-          <rect x={mid - metricWidth / 2} y={labelY + 7} width={metricWidth} height="22" rx="11" />
-          <text x={mid} y={labelY + 22}>{metricLabel}</text>
+          <text x={labelX} y={labelY + 24}>{metricLabel}</text>
         </g>
       ) : null}
     </g>
   );
 }
 
+function edgeAnchors(source, target, sourceSize, targetSize) {
+  const sourceCenter = {
+    x: source.x + sourceSize.width / 2,
+    y: source.y + sourceSize.height / 2,
+  };
+  const targetCenter = {
+    x: target.x + targetSize.width / 2,
+    y: target.y + targetSize.height / 2,
+  };
+  const dx = targetCenter.x - sourceCenter.x;
+  const dy = targetCenter.y - sourceCenter.y;
+  const gap = 10;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const direction = dx >= 0 ? 1 : -1;
+    return {
+      orientation: 'horizontal',
+      direction,
+      x1: direction > 0 ? source.x + sourceSize.width : source.x,
+      y1: sourceCenter.y,
+      x2: direction > 0 ? target.x - gap : target.x + targetSize.width + gap,
+      y2: targetCenter.y,
+    };
+  }
+  const direction = dy >= 0 ? 1 : -1;
+  return {
+    orientation: 'vertical',
+    direction,
+    x1: sourceCenter.x,
+    y1: direction > 0 ? source.y + sourceSize.height : source.y,
+    x2: targetCenter.x,
+    y2: direction > 0 ? target.y - gap : target.y + targetSize.height + gap,
+  };
+}
+
 function DraftEdge({ draft, nodeMap }) {
   const source = nodeMap[draft.sourceNodeId];
   if (!source || !draft.pointer) return null;
-  const x1 = source.x + source.width;
-  const y1 = source.y + source.height / 2;
+  const sourceSize = topologyNodeVisualSize(true);
+  const x1 = source.x + sourceSize.width;
+  const y1 = source.y + sourceSize.height / 2;
   const x2 = draft.pointer.x;
   const y2 = draft.pointer.y;
   return (
@@ -1258,6 +1431,184 @@ function edgeDraftText(draft, nodeMap) {
   const source = draft.sourceNodeId ? nodeMap[draft.sourceNodeId]?.nodeName : '未选择源节点';
   const target = draft.targetNodeId ? nodeMap[draft.targetNodeId]?.nodeName : '未选择目标节点';
   return `${source} -> ${target}`;
+}
+
+function AlignmentGuides({ guides, viewBox }) {
+  if (!guides || (!guides.vertical && !guides.horizontal)) return null;
+  return (
+    <g className="fp-topology-align-guides">
+      {guides.vertical != null ? (
+        <line x1={guides.vertical} y1={viewBox.y} x2={guides.vertical} y2={viewBox.y + viewBox.height} />
+      ) : null}
+      {guides.horizontal != null ? (
+        <line x1={viewBox.x} y1={guides.horizontal} x2={viewBox.x + viewBox.width} y2={guides.horizontal} />
+      ) : null}
+    </g>
+  );
+}
+
+function snapNodePosition(rawX, rawY, nodeId, nodes, size) {
+  const activeWidth = size.width;
+  const activeHeight = size.height;
+  let x = snapToGrid(rawX);
+  let y = snapToGrid(rawY);
+  const guides = {};
+  const activeXPoints = [
+    { value: x, offset: 0 },
+    { value: x + activeWidth / 2, offset: activeWidth / 2 },
+    { value: x + activeWidth, offset: activeWidth },
+  ];
+  const activeYPoints = [
+    { value: y, offset: 0 },
+    { value: y + activeHeight / 2, offset: activeHeight / 2 },
+    { value: y + activeHeight, offset: activeHeight },
+  ];
+  let bestX = null;
+  let bestY = null;
+  nodes.filter((node) => node.id !== nodeId).forEach((node) => {
+    const nodeX = Number(node.x || 0);
+    const nodeY = Number(node.y || 0);
+    const width = Number(node.width || size.width || NODE_SIZE.width);
+    const height = Number(node.height || size.height || NODE_SIZE.height);
+    const xTargets = [nodeX, nodeX + width / 2, nodeX + width];
+    const yTargets = [nodeY, nodeY + height / 2, nodeY + height];
+    activeXPoints.forEach((point) => {
+      xTargets.forEach((target) => {
+        const distance = Math.abs(point.value - target);
+        if (distance <= ALIGN_THRESHOLD && (!bestX || distance < bestX.distance)) {
+          bestX = { distance, x: target - point.offset, guide: target };
+        }
+      });
+    });
+    activeYPoints.forEach((point) => {
+      yTargets.forEach((target) => {
+        const distance = Math.abs(point.value - target);
+        if (distance <= ALIGN_THRESHOLD && (!bestY || distance < bestY.distance)) {
+          bestY = { distance, y: target - point.offset, guide: target };
+        }
+      });
+    });
+  });
+  if (bestX) {
+    x = bestX.x;
+    guides.vertical = bestX.guide;
+  }
+  if (bestY) {
+    y = bestY.y;
+    guides.horizontal = bestY.guide;
+  }
+  return {
+    x,
+    y,
+    guides: {
+      vertical: guides.vertical != null ? guides.vertical : null,
+      horizontal: guides.horizontal != null ? guides.horizontal : null,
+    },
+  };
+}
+
+function snapToGrid(value) {
+  return Math.round(Number(value || 0) / GRID_SIZE) * GRID_SIZE;
+}
+
+function topologyNodeVisualSize(showMetrics) {
+  return showMetrics ? { width: 250, height: 210 } : { width: 250, height: 140 };
+}
+
+function fitTopologyViewBox(nodes, showMetrics, options = {}) {
+  if (!nodes.length) return DEFAULT_VIEWBOX;
+  const size = topologyNodeVisualSize(showMetrics);
+  const mode = options.mode || 'reset';
+  const currentViewBox = options.currentViewBox;
+  const svgRect = options.svg ? options.svg.getBoundingClientRect() : null;
+  const svgRatio = svgRect && svgRect.width > 0 && svgRect.height > 0
+    ? svgRect.width / svgRect.height
+    : DEFAULT_VIEWBOX.width / DEFAULT_VIEWBOX.height;
+  const padding = showMetrics ? 96 : 82;
+  const minViewport = showMetrics
+    ? { width: 1120, height: 680 }
+    : { width: DEFAULT_VIEWBOX.width, height: DEFAULT_VIEWBOX.height };
+  const minX = Math.min(...nodes.map((node) => Number(node.x || 0)));
+  const minY = Math.min(...nodes.map((node) => Number(node.y || 0)));
+  const maxX = Math.max(...nodes.map((node) => Number(node.x || 0) + size.width));
+  const maxY = Math.max(...nodes.map((node) => Number(node.y || 0) + size.height));
+  const contentWidth = maxX - minX;
+  const contentHeight = maxY - minY;
+  const desiredWidth = Math.max(contentWidth + padding * 2, minViewport.width);
+  const desiredHeight = Math.max(contentHeight + padding * 2, minViewport.height);
+  let width = desiredWidth;
+  let height = desiredHeight;
+  const currentRatio = width / height;
+  if (currentRatio > svgRatio) {
+    height = width / svgRatio;
+  } else {
+    width = height * svgRatio;
+  }
+  width = Math.max(width, minViewport.width);
+  height = Math.max(height, minViewport.height);
+  const centerX = minX + contentWidth / 2;
+  const centerY = minY + contentHeight / 2;
+  if (mode === 'preserveOrigin' && currentViewBox) {
+    const nextX = centerX - width / 2;
+    const nextY = centerY - height / 2;
+    const currentCenterX = currentViewBox.x + currentViewBox.width / 2;
+    const currentCenterY = currentViewBox.y + currentViewBox.height / 2;
+    const result = {
+      x: currentCenterX - width / 2 + (nextX - (currentCenterX - width / 2)) * 0.35,
+      y: currentCenterY - height / 2 + (nextY - (currentCenterY - height / 2)) * 0.35,
+      width,
+      height,
+    };
+    debugTopologyFit('fit-result', {
+      reason: options.reason,
+      mode,
+      showMetrics,
+      nodeCount: nodes.length,
+      svgRect: readSvgRect(options.svg),
+      svgRatio,
+      bounds: { minX, minY, maxX, maxY, contentWidth, contentHeight, desiredWidth, desiredHeight, centerX, centerY },
+      currentViewBox,
+      result,
+    });
+    return result;
+  }
+  const result = {
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+    width,
+    height,
+  };
+  debugTopologyFit('fit-result', {
+    reason: options.reason,
+    mode,
+    showMetrics,
+    nodeCount: nodes.length,
+    svgRect: readSvgRect(options.svg),
+    svgRatio,
+    bounds: { minX, minY, maxX, maxY, contentWidth, contentHeight, desiredWidth, desiredHeight, centerX, centerY },
+    result,
+  });
+  return result;
+}
+
+function readSvgRect(svg) {
+  if (!svg || !svg.getBoundingClientRect) return null;
+  const rect = svg.getBoundingClientRect();
+  return {
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+    left: Math.round(rect.left),
+    top: Math.round(rect.top),
+  };
+}
+
+function debugTopologyFit(stage, payload) {
+  if (!TOPOLOGY_FIT_DEBUG || typeof console === 'undefined') return;
+  console.log('[FlowPulse][TopologyFit]', stage, payload);
+}
+
+function defaultMetricDisplayName(metric) {
+  return compactMetricName(metric?.metricName || metric?.metricCode || '指标');
 }
 
 function defaultTopologyMetricConfig(context, metrics = [], implementations = []) {
@@ -1276,6 +1627,9 @@ function defaultTopologyMetricConfig(context, metrics = [], implementations = []
     executionMode: firstImplementation?.executionMode || 'SERVER',
     intervalSec: 60,
     parameterJson: '',
+    showOnTopology: true,
+    displayName: defaultMetricDisplayName(firstMetric),
+    displayOrder: 100,
     enabled: true,
   };
 }
@@ -1288,6 +1642,9 @@ function normalizeTopologyMetricConfig(form, context) {
     objectCode: context.objectCode,
     objectName: context.objectName,
     intervalSec: Number(form.intervalSec || 60),
+    showOnTopology: form.showOnTopology !== false,
+    displayName: String(form.displayName || '').trim(),
+    displayOrder: Number.isFinite(Number(form.displayOrder)) ? Number(form.displayOrder) : 100,
     enabled: form.enabled !== false,
   };
 }
@@ -1399,6 +1756,14 @@ function objectTypeText(value) {
   return map[value] || value || '-';
 }
 
+function topologyIcon(type) {
+  const value = String(type || '').toUpperCase();
+  if (value.includes('KAFKA')) return kafkaIcon;
+  if (value.includes('SPARK')) return sparkIcon;
+  if (value.includes('ES') || value.includes('ELASTIC')) return elasticsearchIcon;
+  return applicationIcon;
+}
+
 function edgeTypeText(value) {
   const map = {
     DATA_FLOW: '数据流',
@@ -1446,6 +1811,40 @@ function normalizeEdge(edge) {
   };
 }
 
+function normalizeTopologyRuntime(response, nodes, edges) {
+  const configs = [];
+  const alerts = [];
+  const elements = Array.isArray(response?.elements) ? response.elements : [];
+  const elementById = {};
+  nodes.forEach((node) => { elementById[node.id] = { type: 'NODE', objectType: node.objectType, objectId: node.objectId }; });
+  edges.forEach((edge) => { elementById[edge.id] = { type: 'EDGE', objectType: 'TOPOLOGY_EDGE', objectId: edge.id }; });
+  elements.forEach((element) => {
+    const fallback = elementById[element.elementId] || {};
+    const objectType = element.objectType || fallback.objectType;
+    const objectId = element.objectId || fallback.objectId;
+    (element.metrics || []).forEach((metric) => {
+      configs.push({
+        ...metric,
+        id: metric.configId,
+        objectType,
+        objectId,
+        enabled: true,
+      });
+    });
+    (element.alerts || []).forEach((alert) => {
+      alerts.push({
+        ...alert,
+        currentLevel: alert.level,
+        topologyElementId: element.elementId,
+        topologyElementType: element.elementType || fallback.type,
+        objectType,
+        objectId,
+      });
+    });
+  });
+  return { configs, alerts };
+}
+
 function buildCanvasRuntime(nodes, edges, configs, alerts, metricDefinitionMap) {
   const byElementId = {};
   nodes.forEach((node) => {
@@ -1486,6 +1885,8 @@ function buildCanvasRuntime(nodes, edges, configs, alerts, metricDefinitionMap) 
       .sort((left, right) => {
         const levelDiff = severityRank(right.alertLevel) - severityRank(left.alertLevel);
         if (levelDiff !== 0) return levelDiff;
+        const orderDiff = Number(left.displayOrder ?? 100) - Number(right.displayOrder ?? 100);
+        if (orderDiff !== 0) return orderDiff;
         const leftTime = Number(left.currentValueAt || left.lastCollectAt || 0);
         const rightTime = Number(right.currentValueAt || right.lastCollectAt || 0);
         return rightTime - leftTime;
@@ -1497,36 +1898,41 @@ function buildCanvasRuntime(nodes, edges, configs, alerts, metricDefinitionMap) 
   };
 }
 
-function topologyElementRuntimeKeys(nodes, edges) {
-  const keys = new Set();
-  nodes.forEach((node) => keys.add(runtimeKey(node.objectType, node.objectId)));
-  edges.forEach((edge) => keys.add(runtimeKey('TOPOLOGY_EDGE', edge.id)));
-  return keys;
-}
-
 function runtimeKey(objectType, objectId) {
   return `${objectType || ''}::${objectId || ''}`;
 }
 
 function metricDisplayItems(configs, metricDefinitionMap) {
   return configs
-    .filter((config) => config.enabled !== false)
+    .filter((config) => config.enabled !== false && config.showOnTopology !== false)
     .map((config) => {
       const metric = metricDefinitionMap[config.metricDefinitionId] || {};
       return {
         ...config,
+        displayName: config.displayName || defaultMetricDisplayName(metric),
+        displayOrder: Number.isFinite(Number(config.displayOrder)) ? Number(config.displayOrder) : 100,
         unit: metric.valueUnit || config.valueUnit || '',
         precision: Number.isFinite(Number(metric.valuePrecision)) ? Number(metric.valuePrecision) : 2,
       };
     })
-    .sort((left, right) => Number(right.currentValueAt || right.lastCollectAt || 0) - Number(left.currentValueAt || left.lastCollectAt || 0));
+    .sort((left, right) => {
+      const orderDiff = Number(left.displayOrder ?? 100) - Number(right.displayOrder ?? 100);
+      if (orderDiff !== 0) return orderDiff;
+      return Number(right.currentValueAt || right.lastCollectAt || 0) - Number(left.currentValueAt || left.lastCollectAt || 0);
+    });
 }
 
 function metricShortText(metric) {
   return `${metricNameText(metric)} ${metricValueText(metric)}`;
 }
 
+function nodeNameText(name) {
+  const value = String(name || '未命名节点');
+  return value.length > 15 ? `${value.slice(0, 15)}…` : value;
+}
+
 function metricNameText(metric) {
+  if (metric.displayName) return compactMetricName(metric.displayName);
   const name = metric.metricName || metric.metricCode || '指标';
   return compactMetricName(name);
 }
@@ -1543,6 +1949,24 @@ function compactMetricName(name) {
 function metricValueText(metric) {
   const value = metric.currentValue === null || metric.currentValue === undefined ? '-' : formatMetricValue(metric.currentValue, metric.precision);
   return `${value}${metric.unit || ''}`;
+}
+
+function metricCanvasValueText(metric) {
+  const number = Number(metric.currentValue);
+  if (!Number.isFinite(number)) return `-${metric.unit || ''}`;
+  const unit = metric.unit || '';
+  if (unit.toLowerCase() === 'ms' && number > 946684800000) {
+    return new Date(number).toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
+  if (Math.abs(number) >= 100000000) return `${(number / 100000000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })}亿${unit}`;
+  if (Math.abs(number) >= 10000) return `${(number / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 })}万${unit}`;
+  return metricValueText(metric);
 }
 
 function formatMetricValue(value, precision = 2) {

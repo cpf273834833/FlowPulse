@@ -34,6 +34,13 @@ public class ResourceMetricConfigSaveRequest {
     private Integer intervalSec;
 
     private String parameterJson;
+    private Boolean showOnTopology;
+
+    @Size(max = 64, message = "{metric.name.size}")
+    private String displayName;
+
+    private Integer displayOrder;
+
     private Boolean enabled;
 
     @Size(max = 512, message = "{common.description.size}")
@@ -59,6 +66,12 @@ public class ResourceMetricConfigSaveRequest {
     public void setIntervalSec(Integer intervalSec) { this.intervalSec = intervalSec; }
     public String getParameterJson() { return parameterJson; }
     public void setParameterJson(String parameterJson) { this.parameterJson = parameterJson; }
+    public Boolean getShowOnTopology() { return showOnTopology; }
+    public void setShowOnTopology(Boolean showOnTopology) { this.showOnTopology = showOnTopology; }
+    public String getDisplayName() { return displayName; }
+    public void setDisplayName(String displayName) { this.displayName = displayName; }
+    public Integer getDisplayOrder() { return displayOrder; }
+    public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     public String getDescription() { return description; }

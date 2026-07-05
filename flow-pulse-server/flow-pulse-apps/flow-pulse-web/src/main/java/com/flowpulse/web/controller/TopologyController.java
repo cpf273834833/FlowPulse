@@ -7,7 +7,9 @@ import com.flowpulse.topology.api.request.TopologySaveRequest;
 import com.flowpulse.topology.api.response.TopologyDetailResponse;
 import com.flowpulse.topology.api.response.TopologyPageResponse;
 import com.flowpulse.topology.api.response.TopologyResponse;
+import com.flowpulse.topology.api.response.TopologyRuntimeResponse;
 import com.flowpulse.topology.application.TopologyService;
+import com.flowpulse.web.application.TopologyRuntimeFacade;
 import com.flowpulse.web.support.TenantIdResolver;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,21 +29,33 @@ import javax.validation.Valid;
 @RequestMapping("/frontapi/v1/topologies")
 public class TopologyController {
     private final TopologyService topologyService;
+    private final TopologyRuntimeFacade topologyRuntimeFacade;
     private final TenantIdResolver tenantIdResolver;
 
-    public TopologyController(TopologyService topologyService, TenantIdResolver tenantIdResolver) {
+    public TopologyController(TopologyService topologyService,
+                              TopologyRuntimeFacade topologyRuntimeFacade,
+                              TenantIdResolver tenantIdResolver) {
         this.topologyService = topologyService;
+        this.topologyRuntimeFacade = topologyRuntimeFacade;
         this.tenantIdResolver = tenantIdResolver;
     }
 
     @GetMapping("/page")
     public ApiResponse<TopologyPageResponse> page(HttpServletRequest request, TopologyQueryRequest query) {
-        return ApiResponse.success(topologyService.page(tenantIdResolver.resolve(request), query));
+        String tenantId = tenantIdResolver.resolve(request);
+        TopologyPageResponse response = topologyService.page(tenantId, query);
+        topologyRuntimeFacade.fillTopologyLevels(tenantId, response);
+        return ApiResponse.success(response);
     }
 
     @GetMapping("/{id}")
     public ApiResponse<TopologyDetailResponse> detail(HttpServletRequest request, @PathVariable String id) {
         return ApiResponse.success(topologyService.detail(tenantIdResolver.resolve(request), id));
+    }
+
+    @GetMapping("/{id}/runtime")
+    public ApiResponse<TopologyRuntimeResponse> runtime(HttpServletRequest request, @PathVariable String id) {
+        return ApiResponse.success(topologyRuntimeFacade.snapshot(tenantIdResolver.resolve(request), id));
     }
 
     @PostMapping

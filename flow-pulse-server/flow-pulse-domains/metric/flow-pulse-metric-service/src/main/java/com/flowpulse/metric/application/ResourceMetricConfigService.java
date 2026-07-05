@@ -155,6 +155,9 @@ public class ResourceMetricConfigService {
         entity.setIntervalSec(request.getIntervalSec() == null ? Integer.valueOf(60) : request.getIntervalSec());
         entity.setParameterJson(trim(request.getParameterJson()));
         entity.setParameterSignature(parameterSignature(entity.getParameterJson()));
+        entity.setShowOnTopology(request.getShowOnTopology() == null ? Boolean.TRUE : request.getShowOnTopology());
+        entity.setDisplayName(limit(trim(request.getDisplayName()), 64));
+        entity.setDisplayOrder(request.getDisplayOrder() == null ? Integer.valueOf(100) : request.getDisplayOrder());
         entity.setEnabled(request.getEnabled() == null ? Boolean.TRUE : request.getEnabled());
         entity.setDescription(trim(request.getDescription()));
         validateExecutionChannel(tenantId, entity);
@@ -261,6 +264,9 @@ public class ResourceMetricConfigService {
         response.setIntervalSec(entity.getIntervalSec());
         response.setParameterJson(entity.getParameterJson());
         response.setParameterSignature(entity.getParameterSignature());
+        response.setShowOnTopology(entity.getShowOnTopology() == null ? Boolean.TRUE : entity.getShowOnTopology());
+        response.setDisplayName(entity.getDisplayName());
+        response.setDisplayOrder(entity.getDisplayOrder() == null ? Integer.valueOf(100) : entity.getDisplayOrder());
         response.setEnabled(entity.getEnabled());
         response.setTaskStatus(entity.getTaskStatus());
         response.setLastCollectStatus(entity.getLastCollectStatus());
@@ -340,6 +346,11 @@ public class ResourceMetricConfigService {
 
     private String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private String limit(String value, int maxLength) {
+        String text = trim(value);
+        return text.length() > maxLength ? text.substring(0, maxLength) : text;
     }
 
     private String parameterSignature(String parameterJson) {

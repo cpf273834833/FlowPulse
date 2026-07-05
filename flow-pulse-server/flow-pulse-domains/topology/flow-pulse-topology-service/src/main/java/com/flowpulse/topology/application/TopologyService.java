@@ -207,6 +207,9 @@ public class TopologyService {
         response.setEnvId(entity.getEnvId());
         response.setDescription(entity.getDescription());
         response.setCanvasConfigJson(entity.getCanvasConfigJson());
+        response.setNodeCount(Long.valueOf(topologyNodeMapper.countByTopologyId(entity.getTenantId(), entity.getId())));
+        response.setEdgeCount(Long.valueOf(topologyEdgeMapper.countByTopologyId(entity.getTenantId(), entity.getId())));
+        response.setAlertLevel("NORMAL");
         response.setCreatedAt(entity.getCreatedAt());
         response.setUpdatedAt(entity.getUpdatedAt());
         return response;

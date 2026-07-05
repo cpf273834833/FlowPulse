@@ -25,6 +25,9 @@
         <result property="intervalSec" column="interval_sec"/>
         <result property="parameterJson" column="parameter_json"/>
         <result property="parameterSignature" column="parameter_signature"/>
+        <result property="showOnTopology" column="show_on_topology"/>
+        <result property="displayName" column="display_name"/>
+        <result property="displayOrder" column="display_order"/>
         <result property="enabled" column="enabled"/>
         <result property="taskStatus" column="task_status"/>
         <result property="lastCollectStatus" column="last_collect_status"/>
@@ -117,6 +120,30 @@
           and c.parameter_signature = #{parameterSignature}
     </select>
 
+    <select id="selectTopologyRuntimeConfigs" resultMap="ResourceMetricConfigMap">
+        <include refid="BaseSelect"/>
+        where c.tenant_id = #{tenantId}
+          and c.enabled = true
+          and c.show_on_topology = true
+          and (
+            1 = 0
+            <if test="objectIds != null and objectIds.size() > 0">
+                or c.object_id in
+                <foreach collection="objectIds" item="objectId" open="(" separator="," close=")">
+                    #{objectId}
+                </foreach>
+            </if>
+            <if test="edgeIds != null and edgeIds.size() > 0">
+                or (c.object_type = 'TOPOLOGY_EDGE' and c.object_id in
+                <foreach collection="edgeIds" item="edgeId" open="(" separator="," close=")">
+                    #{edgeId}
+                </foreach>
+                )
+            </if>
+          )
+        order by c.display_order asc, c.updated_at desc
+    </select>
+
     <select id="selectDueTasks" resultMap="ResourceMetricConfigMap">
         <include refid="BaseSelect"/>
         where c.enabled = true
@@ -132,11 +159,13 @@
     <insert id="insert" parameterType="com.flowpulse.metric.domain.model.ResourceMetricConfigEntity">
         insert into fp_resource_metric_config
         (id, tenant_id, object_type, object_id, object_code, object_name, metric_definition_id, implementation_id,
-         execution_mode, executor_node_id, interval_sec, parameter_json, parameter_signature, enabled, task_status, last_collect_status,
+         execution_mode, executor_node_id, interval_sec, parameter_json, parameter_signature, show_on_topology, display_name, display_order,
+         enabled, task_status, last_collect_status,
          last_collect_message, last_collect_at, next_collect_at, description, created_at, updated_at)
         values
         (#{id}, #{tenantId}, #{objectType}, #{objectId}, #{objectCode}, #{objectName}, #{metricDefinitionId}, #{implementationId},
-         #{executionMode}, #{executorNodeId}, #{intervalSec}, #{parameterJson}, #{parameterSignature}, #{enabled}, #{taskStatus}, #{lastCollectStatus},
+         #{executionMode}, #{executorNodeId}, #{intervalSec}, #{parameterJson}, #{parameterSignature}, #{showOnTopology}, #{displayName}, #{displayOrder},
+         #{enabled}, #{taskStatus}, #{lastCollectStatus},
          #{lastCollectMessage}, #{lastCollectAt}, #{nextCollectAt}, #{description}, #{createdAt}, #{updatedAt})
     </insert>
 
@@ -145,7 +174,9 @@
         set object_type = #{objectType}, object_id = #{objectId}, object_code = #{objectCode}, object_name = #{objectName},
             metric_definition_id = #{metricDefinitionId}, implementation_id = #{implementationId},
             execution_mode = #{executionMode}, executor_node_id = #{executorNodeId}, interval_sec = #{intervalSec},
-            parameter_json = #{parameterJson}, parameter_signature = #{parameterSignature}, enabled = #{enabled}, task_status = #{taskStatus},
+            parameter_json = #{parameterJson}, parameter_signature = #{parameterSignature},
+            show_on_topology = #{showOnTopology}, display_name = #{displayName}, display_order = #{displayOrder},
+            enabled = #{enabled}, task_status = #{taskStatus},
             last_collect_status = #{lastCollectStatus}, last_collect_message = #{lastCollectMessage},
             last_collect_at = #{lastCollectAt}, next_collect_at = #{nextCollectAt}, description = #{description},
             updated_at = #{updatedAt}

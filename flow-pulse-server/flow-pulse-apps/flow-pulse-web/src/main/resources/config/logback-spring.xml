@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="60 seconds" debug="false">
+
+    <!-- ============================================================ -->
+    <!-- 属性定义                                                      -->
+    <!-- ============================================================ -->
+
+    <springProperty scope="context" name="logPath" source="work.dir" defaultValue="${user.dir}/../main"/>
+    <property name="logDir" value="${logPath}/logs"/>
+
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="flowpulse"/>
+
+    <property name="maxHistory" value="30"/>
+    <property name="maxFileSize" value="100MB"/>
+    <property name="totalSizeCap" value="10GB"/>
+
+    <!-- ============================================================ -->
+    <!-- 控制台输出 (彩色)                                              -->
+    <!-- ============================================================ -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{36}) - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ============================================================ -->
+    <!-- 文件日志 (滚动，不设阈值过滤器，输出级别由 logger 控制)           -->
+    <!-- ============================================================ -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${logDir}/${appName}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${logDir}/%d{yyyy-MM-dd}/${appName}-%d{yyyy-MM-dd}-%i.log.gz</fileNamePattern>
+            <maxHistory>${maxHistory}</maxHistory>
+            <maxFileSize>${maxFileSize}</maxFileSize>
+            <totalSizeCap>${totalSizeCap}</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%L] - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 异步输出 -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE"/>
+        <queueSize>1024</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- ============================================================ -->
+    <!-- 告警日志 (独立文件)                                             -->
+    <!-- ============================================================ -->
+    <appender name="ALERT_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${logDir}/flowpulse-alert.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${logDir}/%d{yyyy-MM-dd}/flowpulse-alert-%d{yyyy-MM-dd}-%i.log.gz</fileNamePattern>
+            <maxHistory>${maxHistory}</maxHistory>
+            <maxFileSize>${maxFileSize}</maxFileSize>
+            <totalSizeCap>${totalSizeCap}</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC_ALERT" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="ALERT_FILE"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- ============================================================ -->
+    <!-- 日志级别（从 application.yml 读取）                             -->
+    <!-- ============================================================ -->
+
+    <springProperty scope="context" name="LEVEL_FLOWPULSE"   source="logging.level.com.flowpulse"       defaultValue="INFO"/>
+    <springProperty scope="context" name="LEVEL_BAOMIDOU"    source="logging.level.com.baomidou"         defaultValue="WARN"/>
+    <springProperty scope="context" name="LEVEL_MYBATIS"     source="logging.level.org.mybatis"          defaultValue="WARN"/>
+    <springProperty scope="context" name="LEVEL_SPRING"      source="logging.level.org.springframework"   defaultValue="WARN"/>
+    <springProperty scope="context" name="LEVEL_ES"          source="logging.level.org.elasticsearch"     defaultValue="WARN"/>
+    <springProperty scope="context" name="LEVEL_KAFKA"       source="logging.level.org.apache.kafka"      defaultValue="WARN"/>
+    <springProperty scope="context" name="LEVEL_UNDERTOW"    source="logging.level.io.undertow"          defaultValue="WARN"/>
+    <springProperty scope="context" name="LEVEL_QUARTZ"      source="logging.level.org.quartz"           defaultValue="WARN"/>
+    <springProperty scope="context" name="LEVEL_HIKARI"      source="logging.level.com.zaxxer.hikari"    defaultValue="WARN"/>
+    <springProperty scope="context" name="LEVEL_ROOT"        source="logging.level.root"                 defaultValue="INFO"/>
+
+    <logger name="com.flowpulse"        level="${LEVEL_FLOWPULSE}"/>
+
+    <!-- 告警日志独立输出到 alert 文件，不写入主日志 -->
+    <logger name="com.flowpulse.event.service.AlertEventServiceImpl" level="${LEVEL_FLOWPULSE}" additivity="false">
+        <appender-ref ref="ASYNC_ALERT"/>
+    </logger>
+    <logger name="com.baomidou"         level="${LEVEL_BAOMIDOU}"/>
+    <logger name="org.springframework"  level="${LEVEL_SPRING}"/>
+    <logger name="org.elasticsearch"    level="${LEVEL_ES}"/>
+    <logger name="org.apache.kafka"     level="${LEVEL_KAFKA}"/>
+    <logger name="org.mybatis"          level="${LEVEL_MYBATIS}"/>
+    <logger name="io.undertow"          level="${LEVEL_UNDERTOW}"/>
+    <logger name="org.quartz"           level="${LEVEL_QUARTZ}"/>
+    <logger name="com.zaxxer.hikari"    level="${LEVEL_HIKARI}"/>
+
+    <!-- ============================================================ -->
+    <!-- 环境适配                                                      -->
+    <!-- ============================================================ -->
+
+    <springProfile name="dev">
+        <root level="${LEVEL_ROOT}">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="!dev">
+        <root level="${LEVEL_ROOT}">
+            <appender-ref ref="ASYNC_FILE"/>
+        </root>
+    </springProfile>
+
+</configuration>

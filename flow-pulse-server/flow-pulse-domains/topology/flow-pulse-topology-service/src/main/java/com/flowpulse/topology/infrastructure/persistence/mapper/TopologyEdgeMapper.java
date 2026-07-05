@@ -9,6 +9,7 @@ public interface TopologyEdgeMapper {
     TopologyEdgeEntity selectById(@Param("tenantId") String tenantId, @Param("id") String id);
     List<TopologyEdgeEntity> selectByTopologyId(@Param("tenantId") String tenantId, @Param("topologyId") String topologyId);
     long countAll(@Param("tenantId") String tenantId);
+    long countByTopologyId(@Param("tenantId") String tenantId, @Param("topologyId") String topologyId);
     void insert(TopologyEdgeEntity entity);
     void deleteByTopologyId(@Param("tenantId") String tenantId, @Param("topologyId") String topologyId);
 }

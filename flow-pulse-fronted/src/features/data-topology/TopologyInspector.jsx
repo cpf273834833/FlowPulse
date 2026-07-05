@@ -5,6 +5,7 @@ export function ElementEditor({
   selected,
   nodes,
   context,
+  alerts = [],
   activeTab,
   metrics,
   implementations,
@@ -40,6 +41,7 @@ export function ElementEditor({
           executorNodes={executorNodes}
           metricConfigs={metricConfigs}
           thresholdRules={thresholdRules}
+          alerts={alerts}
           metricDraft={metricDraft}
           thresholdDraft={thresholdDraft}
           onMetricDraft={onMetricDraft}
@@ -50,7 +52,7 @@ export function ElementEditor({
           onSaveThreshold={onSaveThreshold}
         />
       ) : null}
-      {currentTab === 'alerts' ? <TopologyAlertPanel context={context} /> : null}
+      {currentTab === 'alerts' ? <TopologyAlertPanel context={context} alerts={alerts} /> : null}
     </div>
   );
 }
@@ -62,6 +64,7 @@ function TopologyMetricPanel({
   executorNodes,
   metricConfigs,
   thresholdRules,
+  alerts,
   metricDraft,
   thresholdDraft,
   onMetricDraft,
@@ -76,6 +79,11 @@ function TopologyMetricPanel({
   configs.forEach((item) => { configByMetricId[item.metricDefinitionId] = item; });
   const thresholdByMetric = {};
   (thresholdRules || []).forEach((rule) => { thresholdByMetric[rule.metricDefinitionId] = rule; });
+  const alertLevelByMetric = {};
+  (alerts || []).forEach((alert) => {
+    if (!alert.metricDefinitionId) return;
+    alertLevelByMetric[alert.metricDefinitionId] = highestSeverity([alertLevelByMetric[alert.metricDefinitionId] || 'NORMAL', alert.currentLevel || alert.level]);
+  });
   const availableMetrics = (metrics || []).filter((metric) => !configByMetricId[metric.id]);
   const allMetrics = metrics || [];
   const draft = metricDraft;
@@ -100,18 +108,23 @@ function TopologyMetricPanel({
           const config = configByMetricId[metric.id];
           const enabled = Boolean(config && config.enabled !== false);
           const thresholdRule = thresholdByMetric[metric.id];
+          const alertLevel = alertLevelByMetric[metric.id] || 'NORMAL';
           const editingThisMetric = draft && draft.metricDefinitionId === metric.id;
           return (
-            <article className={`fp-topology-metric-card ${enabled ? 'is-enabled' : 'is-disabled'}`} key={metric.id}>
+            <article className={`fp-topology-metric-card ${enabled ? 'is-enabled' : 'is-disabled'} ${severityClass(alertLevel)}`} key={metric.id}>
               <button className="fp-topology-metric-card__main" type="button" disabled={!config} onClick={() => config && onMetricDraft(config)}>
                 <div>
-                  <strong>{metric.metricName || config?.metricName || metric.metricCode}</strong>
+                  <strong>{config?.displayName || metric.metricName || config?.metricName || metric.metricCode}</strong>
                   <span>{metric.metricCode || config?.metricCode || metric.id}</span>
                 </div>
-                <em className={config?.parameterJson ? 'is-ready' : ''}>{config ? (config.parameterJson ? '参数已配置' : '待配参数') : '未开启'}</em>
+                <em className={alertLevel !== 'NORMAL' ? 'is-alert' : (config?.parameterJson ? 'is-ready' : '')}>{alertLevel !== 'NORMAL' ? alertText(alertLevel) : (config ? (config.parameterJson ? '参数已配置' : '待配参数') : '未开启')}</em>
                 <small>{config ? `${config.implementationName || '默认实现'} / ${labelExecutionMode(config.executionMode)} / ${config.intervalSec || 60}s` : '开启后可配置采集实现、参数和周期'}</small>
                 {config ? (
-                  <div className="fp-topology-metric-runtime">
+                  <>
+                    <small className="fp-topology-metric-display-line">
+                      拓扑展示：{config.showOnTopology === false ? '不展示' : '展示'} / 名称：{config.displayName || metric.metricName || metric.metricCode || '-'} / 排序：{config.displayOrder ?? 100}
+                    </small>
+                    <div className="fp-topology-metric-runtime">
                     <span>
                       <b>当前值</b>
                       <strong>{formatMetricValue(config.currentValue, metric.valueUnit)}</strong>
@@ -124,7 +137,8 @@ function TopologyMetricPanel({
                       <b>采集状态</b>
                       <strong>{collectStatusText(config.lastCollectStatus)}</strong>
                     </span>
-                  </div>
+                    </div>
+                  </>
                 ) : null}
               </button>
               <label className={`fp-switch-field ${enabled ? 'is-on' : ''}`} onClick={(event) => event.stopPropagation()}>
@@ -227,7 +241,7 @@ function TopologyThresholdForm({ draft, onDraft, onCancel, onSave }) {
   );
 }
 
-function TopologyAlertPanel({ context }) {
+function TopologyAlertPanel({ context, alerts = [] }) {
   return (
     <div className="fp-topology-config-panel">
       <div className="fp-topology-config-head">
@@ -236,10 +250,24 @@ function TopologyAlertPanel({ context }) {
           <span>当前元素：{context?.objectName || '-'}</span>
         </div>
       </div>
-      <div className="fp-topology-alert-empty">
-        <strong>暂无活动告警</strong>
-        <span>这里将展示当前节点或连线的活动告警、最近恢复记录和故障解释。</span>
-      </div>
+      {alerts.length === 0 ? (
+        <div className="fp-topology-alert-empty">
+          <strong>暂无活动告警</strong>
+          <span>这里将展示当前节点或连线的活动告警、最近恢复记录和故障解释。</span>
+        </div>
+      ) : (
+        <div className="fp-topology-alert-list">
+          {alerts.map((alert) => (
+            <article className={`fp-topology-alert-item ${severityClass(alert.currentLevel || alert.level)}`} key={alert.id || alert.alertKey}>
+              <div>
+                <strong>{alertText(alert.currentLevel || alert.level)}</strong>
+                <span>{alert.message || '指标阈值触发活动告警'}</span>
+              </div>
+              <em>{formatTime(alert.lastChangedAt || alert.firstTriggeredAt)}</em>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -336,6 +364,24 @@ function severityText(value) {
     UNKNOWN: '未知',
   };
   return map[value] || value || '-';
+}
+
+function alertText(value) {
+  return severityText(value);
+}
+
+function highestSeverity(levels) {
+  return levels.reduce((highest, level) => (severityRank(level) > severityRank(highest) ? level : highest), 'NORMAL');
+}
+
+function severityRank(level) {
+  const map = { NORMAL: 0, UNKNOWN: 1, REMIND: 2, WARNING: 3, ERROR: 4, CRITICAL: 5, EMERGENCY: 5 };
+  return map[level] ?? 0;
+}
+
+function severityClass(level) {
+  const normalized = level === 'REMIND' ? 'INFO' : (level || 'NORMAL');
+  return `is-alert-${String(normalized).toLowerCase()}`;
 }
 
 function nodeTypeText(value) {
