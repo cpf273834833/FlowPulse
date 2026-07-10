@@ -223,7 +223,10 @@ public class BuiltInMetricCollector implements MetricCollector {
     private MetricCollectResult collectSparkExecutorCount(MetricCollectContext context) throws Exception {
         SparkTarget target = resolveSparkTarget(context.getConfig());
         JsonNode application = findSparkApplication(target);
-        int executors = firstInt(application, "executors", "executorCount", "executor_count");
+        int executors = countSparkStandaloneExecutors(target, application);
+        if (executors < 0) {
+            executors = firstInt(application, "executors", "executorCount", "executor_count");
+        }
         if (executors < 0) {
             executors = Math.max(0, application.path("allocatedmb").asInt(0) > 0 ? 1 : 0);
         }
@@ -464,9 +467,50 @@ public class BuiltInMetricCollector implements MetricCollector {
         return MissingNode.getInstance();
     }
 
+    private int countSparkStandaloneExecutors(SparkTarget target, JsonNode application) throws Exception {
+        String applicationId = firstNotBlank(application.path("id").asText(""), target.applicationId, "");
+        String applicationName = firstNotBlank(application.path("name").asText(""), target.applicationName, "");
+        JsonNode master = valueReader.readTree(httpGet(target.infrastructure, "/json"));
+        JsonNode workers = master.path("workers");
+        if (!workers.isArray()) {
+            return -1;
+        }
+        int count = 0;
+        boolean workerJsonAvailable = false;
+        for (JsonNode worker : workers) {
+            String webUiAddress = text(worker, "webuiaddress");
+            if (!notBlank(webUiAddress)) {
+                continue;
+            }
+            try {
+                JsonNode workerRoot = valueReader.readTree(httpGetUrl(target.infrastructure, trimTrailingSlash(webUiAddress) + "/json"));
+                workerJsonAvailable = true;
+                JsonNode executors = workerRoot.path("executors");
+                if (!executors.isArray()) {
+                    continue;
+                }
+                for (JsonNode executor : executors) {
+                    String executorAppId = firstNotBlank(text(executor, "appid"), text(executor, "appId"), text(executor, "app_id"));
+                    String executorAppName = executor.path("appdesc").path("name").asText("");
+                    if ((notBlank(applicationId) && applicationId.equals(executorAppId))
+                            || (notBlank(applicationName) && applicationName.equals(executorAppName))) {
+                        count++;
+                    }
+                }
+            } catch (Exception ignored) {
+                // A single Worker Web UI may be unreachable while the Master is healthy; keep collecting from other workers.
+            }
+        }
+        return workerJsonAvailable ? count : -1;
+    }
+
     private String httpGet(InfrastructureEntity infrastructure, String path) throws Exception {
         String base = normalizeBaseEndpoint(infrastructure.getEndpoint());
         String url = base.endsWith("/") ? base.substring(0, base.length() - 1) + path : base + path;
+        return httpGetUrl(infrastructure, url);
+    }
+
+    private String httpGetUrl(InfrastructureEntity infrastructure, String url) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(10000);
         connection.setReadTimeout(10000);
@@ -491,6 +535,14 @@ public class BuiltInMetricCollector implements MetricCollector {
         } finally {
             reader.close();
         }
+    }
+
+    private String trimTrailingSlash(String value) {
+        String text = value == null ? "" : value.trim();
+        while (text.endsWith("/")) {
+            text = text.substring(0, text.length() - 1);
+        }
+        return text;
     }
 
     private double deltaPerSecond(ResourceMetricConfigEntity config, String metadataField, long currentValue, long now) {
