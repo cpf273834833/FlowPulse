@@ -12,7 +12,9 @@ import { infrastructureApi } from '../../api/infrastructureApi';
 import { metricApi } from '../../api/metricApi';
 import { thresholdApi } from '../../api/thresholdApi';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EnvironmentScopeTree from '../../components/EnvironmentScopeTree';
 import Pagination from '../../components/Pagination';
+import { StatIcon } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
 import { t } from '../../i18n';
 
@@ -79,6 +81,7 @@ export default function InfrastructurePage() {
   const [confirm, setConfirm] = useState(null);
   const [detailId, setDetailId] = useState('');
   const [testingId, setTestingId] = useState('');
+  const [syncingId, setSyncingId] = useState('');
   const [resources, setResources] = useState({ records: [], total: 0, pageNo: 1, pageSize: 10 });
   const [resourceQuery, setResourceQuery] = useState({ pageNo: 1, pageSize: 10 });
   const [syncMode, setSyncMode] = useState('RECONCILE');
@@ -343,6 +346,10 @@ export default function InfrastructurePage() {
   }
 
   async function sync(item) {
+    if (syncingId) {
+      return;
+    }
+    setSyncingId(item.id);
     try {
       const result = await infrastructureApi.sync(item.id, syncMode);
       setMessage(actionMessage('sync', item, result));
@@ -352,6 +359,8 @@ export default function InfrastructurePage() {
       }
     } catch (error) {
       setMessage(actionMessage('sync', item, { status: 'ERROR', message: error.message }));
+    } finally {
+      setSyncingId('');
     }
   }
 
@@ -551,6 +560,7 @@ export default function InfrastructurePage() {
                 <Info label={t('infrastructure.syncInterval')} value={`${detail.syncIntervalSec || 0}s`} />
                 <Info label={t('infrastructure.syncEnabled')} value={detail.syncEnabled ? t('yes') : t('no')} />
                 <Info label={t('infrastructure.lastSync')} value={formatTime(detail.lastSyncAt)} />
+                <Info label={t('infrastructure.lastSyncMessage')} value={normalizeActionMessage(detail.lastSyncMessage) || '-'} />
               </ConfigBlock>
             </section>
 
@@ -568,24 +578,16 @@ export default function InfrastructurePage() {
               />
             </div>
             <SelectBare value={syncMode} options={SYNC_MODE_OPTIONS} onChange={(value) => changeSyncMode(detail, value)} />
-            <button className="fp-button fp-button--primary fp-resource-sync-button" type="button" onClick={() => sync(detail)}><CloudSyncOutlined />{t('infrastructure.sync')}</button>
+            <button className={`fp-button fp-button--primary fp-resource-sync-button ${syncingId === detail.id ? 'is-loading' : ''}`} type="button" disabled={syncingId === detail.id} onClick={() => sync(detail)}><CloudSyncOutlined />{syncingId === detail.id ? t('loading') : t('infrastructure.sync')}</button>
           </div>
           </div>
-          <div className="fp-data-table">
-            <div className="fp-data-table__row fp-data-table__row--head">
-              <span>{t('infrastructure.resourceName')}</span>
-              <span>{t('infrastructure.resourceType')}</span>
-              <span>{t('infrastructure.status')}</span>
-              <span>{t('infrastructure.lastSync')}</span>
-            </div>
+          <div className="fp-logical-card-grid">
             {resources.records.length === 0 ? <div className="fp-empty">{t('empty')}</div> : null}
             {resources.records.map((resource) => (
-              <div className="fp-data-table__row" key={resource.id}>
-                <strong>{resource.resourceName}</strong>
-                <span>{resource.resourceType}</span>
-                <span>{resource.status}</span>
-                <span>{formatTime(resource.lastSyncAt)}</span>
-              </div>
+              <article className="fp-management-card" key={resource.id}>
+                <div className="fp-management-card__header"><strong>{resource.resourceName}</strong><span className="fp-status-text">{resource.status}</span></div>
+                <div className="fp-threshold-kv"><div><span>{t('infrastructure.resourceType')}</span><strong>{resource.resourceType}</strong></div><div><span>{t('infrastructure.lastSync')}</span><strong>{formatTime(resource.lastSyncAt)}</strong></div></div>
+              </article>
             ))}
           </div>
           <Pagination
@@ -620,7 +622,7 @@ export default function InfrastructurePage() {
       <div className="fp-stat-grid">
         {page.stats.map((stat, index) => (
           <div className="fp-stat" key={stat.title}>
-            <div className="fp-stat__icon">{index % 2 === 0 ? <DatabaseOutlined /> : <ApiOutlined />}</div>
+            <StatIcon stat={{ ...stat, title: t(stat.title) }} />
             <div>
               <span>{t(stat.title)}</span>
               <strong>{stat.value}</strong>
@@ -636,12 +638,16 @@ export default function InfrastructurePage() {
           {loading ? <span className="fp-muted-text">{t('loading')}</span> : null}
         </div>
         <div className="fp-infra-workspace">
-          <EnvironmentTree
+          <EnvironmentScopeTree
             environments={page.environments}
             regions={page.regions}
             selectedEnvId={query.envId || ''}
             selectedRegionId={query.regionId || ''}
             onSelect={selectScope}
+            title={t('infrastructure.scopeTree')}
+            allLabel={t('infrastructure.allScope')}
+            managementLabel={t('managementRegion')}
+            computeLabel={t('computeRegion')}
           />
           <div className="fp-infra-content">
             <div className="fp-infra-content__bar">
@@ -834,11 +840,15 @@ function InfrastructureMetricConfigPage({ detail, env, region, formPage, metrics
               label={t('metric.implementation')}
               value={form.implementationId || ''}
               options={[['', 'metric.useDefaultImplementation']].concat(availableImplementations.map((item) => [item.id, item.implementationName]))}
-              onChange={(implementationId) => setForm({ ...form, implementationId })}
+              onChange={(implementationId) => {
+                const implementation = availableImplementations.find((item) => item.id === implementationId);
+                const executionMode = implementation?.executionMode || form.executionMode || 'SERVER';
+                setForm({ ...form, implementationId, executionMode, executorNodeId: executionMode === 'SERVER' || executionMode === 'EXPRESSION' ? '' : form.executorNodeId });
+              }}
             />
             <FieldSelect
               label={t('metric.executionMode')}
-              value={form.executionMode || 'SSH'}
+              value={form.executionMode || 'SERVER'}
               options={EXECUTION_OPTIONS}
               onChange={(executionMode) => setForm({ ...form, executionMode, executorNodeId: executionMode === 'SERVER' || executionMode === 'EXPRESSION' ? '' : form.executorNodeId })}
             />
@@ -1408,7 +1418,7 @@ function defaultInfrastructureMetricConfig(infrastructure, metric = null) {
     objectName: infrastructure.name,
     metricDefinitionId: metric ? metric.id : '',
     implementationId: '',
-    executionMode: 'SSH',
+    executionMode: 'SERVER',
     intervalSec: 60,
     parameterJson: '',
     enabled: true,
@@ -1494,7 +1504,7 @@ function normalizeInfrastructureMetricConfig(form, infrastructure) {
     objectName: infrastructure.name,
     metricDefinitionId: form.metricDefinitionId,
     implementationId: form.implementationId || '',
-    executionMode: form.executionMode || 'SSH',
+    executionMode: form.executionMode || 'SERVER',
     executorNodeId: form.executorNodeId || '',
     intervalSec: Number(form.intervalSec || 60),
     parameterJson: form.parameterJson || '',

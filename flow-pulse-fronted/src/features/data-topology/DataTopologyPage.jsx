@@ -7,6 +7,7 @@ import { metricApi } from '../../api/metricApi';
 import { executorNodeApi } from '../../api/executorNodeApi';
 import { thresholdApi } from '../../api/thresholdApi';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EnvironmentScopeTree from '../../components/EnvironmentScopeTree';
 import Pagination from '../../components/Pagination';
 import Toast from '../../components/Toast';
 import { ElementEditor } from './TopologyInspector';
@@ -43,7 +44,7 @@ export default function DataTopologyPage() {
   const [resourceKeyword, setResourceKeyword] = useState('');
   const [resourceCategory, setResourceCategory] = useState('ALL');
   const [resourceType, setResourceType] = useState('');
-  const [resourcePage, setResourcePage] = useState({ pageNo: 1, pageSize: 30 });
+  const [resourcePage, setResourcePage] = useState({ pageNo: 1, pageSize: 10 });
   const [selected, setSelected] = useState(null);
   const [dragging, setDragging] = useState(null);
   const [panning, setPanning] = useState(null);
@@ -70,6 +71,8 @@ export default function DataTopologyPage() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [confirm, setConfirm] = useState(null);
   const [toast, setToast] = useState(null);
+  const [savedCanvasSignature, setSavedCanvasSignature] = useState(() => canvasSignature([], []));
+  const [savingCanvas, setSavingCanvas] = useState(false);
 
   const nodeMap = useMemo(() => indexById(nodes), [nodes]);
   const usedObjectIds = useMemo(() => new Set(nodes.map((node) => node.objectId)), [nodes]);
@@ -103,6 +106,10 @@ export default function DataTopologyPage() {
     return filteredResources.slice(start, start + resourcePage.pageSize);
   }, [filteredResources, resourcePage]);
   const selectedContext = useMemo(() => selectedElementContext(), [current, selected]);
+  const canvasDirty = useMemo(
+    () => Boolean(current) && canvasSignature(nodes, edges) !== savedCanvasSignature,
+    [current, nodes, edges, savedCanvasSignature],
+  );
 
   useEffect(() => {
     loadEnvs();
@@ -160,6 +167,16 @@ export default function DataTopologyPage() {
     }, delay));
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [mode, current?.id, nodes.length, showCanvasMetrics]);
+
+  useEffect(() => {
+    if (!canvasDirty) return undefined;
+    const warnUnsavedCanvas = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnUnsavedCanvas);
+    return () => window.removeEventListener('beforeunload', warnUnsavedCanvas);
+  }, [canvasDirty]);
 
   useEffect(() => {
     if (mode !== 'canvas' || !current || !nodes.length) return undefined;
@@ -245,6 +262,7 @@ export default function DataTopologyPage() {
       const nextEdges = (response.edges || []).map(normalizeEdge);
       setNodes(nextNodes);
       setEdges(nextEdges);
+      setSavedCanvasSignature(canvasSignature(nextNodes, nextEdges));
       setSelected(null);
       userAdjustedCanvasRef.current = false;
       setCanvasViewBox(fitTopologyViewBox(nextNodes, showCanvasMetrics, { mode: 'initial', svg: svgRef.current, reason: 'open-topology' }));
@@ -275,6 +293,22 @@ export default function DataTopologyPage() {
   }
 
   function backToList() {
+    if (canvasDirty) {
+      setConfirm({
+        title: '画布尚未保存',
+        content: '当前节点、连线或布局存在未保存的修改。离开后这些修改将丢失。',
+        confirmText: '放弃修改',
+        onCancel: () => setConfirm(null),
+        onConfirm: () => {
+          setConfirm(null);
+          setMode('list');
+          setSelected(null);
+          setCanvasFullscreen(false);
+          cancelEdgeDraft();
+        },
+      });
+      return;
+    }
     setMode('list');
     setSelected(null);
     setCanvasFullscreen(false);
@@ -570,7 +604,8 @@ export default function DataTopologyPage() {
 
   function moveDrag(event) {
     if (edgeDraft) {
-      setEdgeDraft((draft) => (draft ? { ...draft, pointer: svgPoint(event) } : draft));
+      const pointer = svgPoint(event);
+      setEdgeDraft((draft) => (draft ? { ...draft, pointer } : draft));
     }
     if (panning) {
       userAdjustedCanvasRef.current = true;
@@ -850,16 +885,22 @@ export default function DataTopologyPage() {
   }
 
   async function saveCanvas() {
-    if (!current) return;
+    if (!current || savingCanvas) return;
+    setSavingCanvas(true);
     try {
       const response = await topologyApi.saveCanvas(current.id, { nodes, edges });
-      setNodes((response.nodes || []).map(normalizeNode));
-      setEdges((response.edges || []).map(normalizeEdge));
+      const savedNodes = (response.nodes || []).map(normalizeNode);
+      const savedEdges = (response.edges || []).map(normalizeEdge);
+      setNodes(savedNodes);
+      setEdges(savedEdges);
+      setSavedCanvasSignature(canvasSignature(savedNodes, savedEdges));
       setSelected(null);
       setToast({ type: 'success', title: '拓扑画布已保存', message: current.topologyName });
-      await loadTopologyRuntime(current, (response.nodes || []).map(normalizeNode), (response.edges || []).map(normalizeEdge));
+      await loadTopologyRuntime(current, savedNodes, savedEdges);
     } catch (error) {
       showError('画布保存失败', error);
+    } finally {
+      setSavingCanvas(false);
     }
   }
 
@@ -924,9 +965,12 @@ export default function DataTopologyPage() {
             <p>{edgeDraft ? edgeDraftText(edgeDraft, nodeMap) : '右键节点可直接创建连线；点击画布空白区域会取消选中并恢复资源列表。'}</p>
           </div>
           <div className="fp-actions">
+            <span className={`fp-topology-save-state ${canvasDirty ? 'is-dirty' : 'is-saved'}`} role="status">
+              {canvasDirty ? '● 有未保存修改' : '✓ 已保存'}
+            </span>
             <button className="fp-button" type="button" onClick={openEdit} disabled={!current}>编辑信息</button>
             <button className="fp-button" type="button" onClick={deleteSelected} disabled={!selected}>删除元素</button>
-            <button className="fp-button fp-button--primary" type="button" onClick={saveCanvas} disabled={!current}>保存画布</button>
+            <button className="fp-button fp-button--primary" type="button" onClick={saveCanvas} disabled={!current || !canvasDirty || savingCanvas}>{savingCanvas ? '保存中…' : canvasDirty ? '保存画布' : '画布已保存'}</button>
             <button className="fp-button fp-button--danger" type="button" onClick={requestDelete} disabled={!current}>删除拓扑</button>
           </div>
         </header>
@@ -1058,12 +1102,18 @@ export default function DataTopologyPage() {
       </header>
 
       <section className="fp-topology-list-layout">
-        <TopologyScopeTree
+        <EnvironmentScopeTree
           environments={envs}
           regions={regions}
           selectedEnvId={selectedEnvId}
           selectedRegionId={selectedRegionId}
           onSelect={selectScope}
+          title="环境区域"
+          allLabel="全部环境区域"
+          allHint="全部拓扑"
+          managementLabel="管理区"
+          computeLabel="计算区"
+          className="fp-topology-scope-tree"
         />
         <main className="fp-card fp-topology-list-main">
           <div className="fp-topology-list-bar">
@@ -2074,4 +2124,11 @@ function defaultStats(nodeCount = 0, edgeCount = 0) {
     { title: '连线', value: String(edgeCount), description: '画布连线' },
     { title: '异常', value: '0', description: '异常元素' },
   ];
+}
+
+function canvasSignature(nodes, edges) {
+  return JSON.stringify({
+    nodes: (nodes || []).map(({ alertLevel, ...node }) => node),
+    edges: (edges || []).map(({ alertLevel, ...edge }) => edge),
+  });
 }

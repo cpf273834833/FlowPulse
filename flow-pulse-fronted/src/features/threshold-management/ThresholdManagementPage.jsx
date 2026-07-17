@@ -3,7 +3,8 @@ import { thresholdApi } from '../../api/thresholdApi';
 import { metricApi } from '../../api/metricApi';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
-import { SecondaryPage } from '../../components/PageChrome';
+import SelectControl from '../../components/SelectControl';
+import { SecondaryPage, StatIcon } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
 import { t } from '../../i18n';
 import './ThresholdManagementPage.css';
@@ -15,6 +16,8 @@ const DEFAULT_QUERY = {
   scopeType: '',
   enabled: '',
 };
+const SCOPE_FILTER_OPTIONS = [['', '全部作用域'], ['GLOBAL', '全局默认'], ['RESOURCE', '资源对象'], ['TOPOLOGY_ELEMENT', '拓扑元素']];
+const ENABLED_FILTER_OPTIONS = [['', '全部状态'], ['true', '启用'], ['false', '停用']];
 
 const CONDITION_SEVERITIES = [
   ['REMIND', '提醒'],
@@ -262,7 +265,7 @@ export default function ThresholdManagementPage() {
       <section className="fp-stat-grid fp-stat-grid--four">
         {(stats.length ? stats : defaultStats()).map((item) => (
           <div className="fp-stat" key={item.title}>
-            <span className="fp-stat__icon">T</span>
+            <StatIcon stat={item} />
             <div><span>{item.title}</span><strong>{item.value}</strong><em>{item.description}</em></div>
           </div>
         ))}
@@ -270,37 +273,32 @@ export default function ThresholdManagementPage() {
 
       <section className="fp-threshold-board fp-threshold-board--single">
         <div className="fp-card fp-threshold-panel">
-          <div className="fp-filter-row fp-filter-row--metric">
+          <div className="fp-filter-row fp-filter-row--metric fp-filter-row--threshold">
             <label className="fp-inline-search">
               <span>⌕</span>
               <input value={query.keyword} placeholder="搜索规则名称、编码、对象" onChange={(event) => setQuery({ ...query, keyword: event.target.value })} onKeyDown={(event) => event.key === 'Enter' && search()} />
             </label>
-            <select className="fp-native-select" value={query.scopeType} onChange={(event) => setQuery({ ...query, pageNo: 1, scopeType: event.target.value })}>
-              <option value="">全部作用域</option><option value="GLOBAL">全局默认</option><option value="RESOURCE">资源对象</option><option value="TOPOLOGY_ELEMENT">拓扑元素</option>
-            </select>
-            <select className="fp-native-select" value={query.enabled} onChange={(event) => setQuery({ ...query, pageNo: 1, enabled: event.target.value })}>
-              <option value="">全部状态</option><option value="true">启用</option><option value="false">停用</option>
-            </select>
+            <SelectControl value={query.scopeType} options={SCOPE_FILTER_OPTIONS} onChange={(scopeType) => setQuery({ ...query, pageNo: 1, scopeType })} />
+            <SelectControl value={query.enabled} options={ENABLED_FILTER_OPTIONS} onChange={(enabled) => setQuery({ ...query, pageNo: 1, enabled })} />
             <button className="fp-button" type="button" onClick={search}>筛选</button>
           </div>
 
-          <div className="fp-data-table fp-threshold-table">
-            <div className="fp-data-table__row fp-data-table__row--head"><span>规则</span><span>指标</span><span>作用域</span><span>对象</span><span>状态</span><span>操作</span></div>
+          <div className="fp-compact-list">
             {loading ? <div className="fp-empty">加载中...</div> : null}
             {!loading && page.records.length === 0 ? <div className="fp-empty">暂无阈值规则</div> : null}
             {page.records.map((rule) => (
-              <div className={`fp-data-table__row ${selected?.id === rule.id ? 'is-selected' : ''}`} key={rule.id} onClick={() => openDetail(rule)}>
-                <strong>{rule.ruleName}<em>{rule.ruleCode}</em></strong>
-                <span>{rule.metricName || rule.metricCode || '-'}</span>
-                <span>{scopeText(rule.scopeType)}</span>
-                <span>{rule.objectName || rule.objectCode || rule.topologyElementId || '全局'}</span>
+              <article className={`fp-compact-row fp-compact-row--threshold ${selected?.id === rule.id ? 'is-selected' : ''}`} key={rule.id} role="button" tabIndex={0} onClick={() => openDetail(rule)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openDetail(rule); }}>
+                <div className="fp-compact-row__identity"><strong>{rule.ruleName}</strong><em>{rule.ruleCode}</em></div>
+                <div className="fp-compact-row__datum"><span>指标</span><strong>{rule.metricName || rule.metricCode || '-'}</strong></div>
+                <div className="fp-compact-row__datum"><span>作用范围</span><strong>{scopeText(rule.scopeType)}</strong></div>
+                <div className="fp-compact-row__datum"><span>对象</span><strong>{rule.objectName || rule.objectCode || rule.topologyElementId || '全局'}</strong></div>
                 <span className={`fp-status-text ${rule.enabled ? 'fp-status-text--normal' : ''}`}>{rule.enabled ? '启用' : '停用'}</span>
-                <div className="fp-actions">
+                <div className="fp-compact-row__actions">
                   <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); openDetail(rule); }}>详情</button>
                   <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); openEdit(rule); }}>编辑</button>
                   <button className="fp-link-button fp-link-button--danger" type="button" onClick={(event) => { event.stopPropagation(); requestDelete(rule); }}>删除</button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
           <Pagination pageNo={page.pageNo} pageSize={page.pageSize} total={page.total} onChange={(pageNo, pageSize) => setQuery({ ...query, pageNo, pageSize })} />
@@ -328,6 +326,10 @@ function ThresholdDetailPage({ rule, metric, onBack, onEdit }) {
       actions={<><button className="fp-button" type="button" onClick={onBack}>返回</button><button className="fp-button fp-button--primary" type="button" onClick={onEdit}>编辑</button></>}
     >
       <div className="fp-secondary-surface">
+        <section className="fp-side-callout fp-side-callout--ok">
+          <span>规则摘要</span>
+          <strong>当 {metric?.metricName || rule.metricName || '指标'} 在 {rule.evaluationWindowSec}s 内连续命中 {rule.consecutiveCount} 次时触发告警，{rule.recoveryPolicy === 'MANUAL' ? '由人工关闭' : '恢复后自动关闭'}。</strong>
+        </section>
         <div className="fp-info-grid">
           <Info label="规则编码" value={rule.ruleCode} />
           <Info label="指标定义" value={metric?.metricName || rule.metricName || '-'} />

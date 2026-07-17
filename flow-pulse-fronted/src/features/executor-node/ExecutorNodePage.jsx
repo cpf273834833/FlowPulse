@@ -7,7 +7,9 @@ import PlusOutlined from '@uyun/icons/PlusOutlined';
 import SearchOutlined from '@uyun/icons/SearchOutlined';
 import { executorNodeApi } from '../../api/executorNodeApi';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import EnvironmentScopeTree from '../../components/EnvironmentScopeTree';
 import Pagination from '../../components/Pagination';
+import { StatIcon } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
 import { t } from '../../i18n';
 
@@ -237,7 +239,7 @@ export default function ExecutorNodePage() {
             <Info label={t('executor.sshAuthType')} value={detail.sshAuthType || '-'} />
             <Info label={t('executor.javaHome')} value={detail.javaHome || '-'} />
             <Info label={t('executor.pythonPath')} value={detail.pythonPath || '-'} />
-            <Info label={t('executor.credential')} value={detail.sshAuthType === 'PRIVATE_KEY' ? t('executor.privateKeySaved') : t('executor.passwordSaved')} />
+            <Info label={t('executor.credential')} value={detail.credentialConfigured ? (detail.sshAuthType === 'PRIVATE_KEY' ? t('executor.privateKeySaved') : t('executor.passwordSaved')) : '未配置'} />
           </DetailSection>
         </div>
         {confirm ? <ConfirmDialog title={confirm.title} content={confirm.content} onCancel={() => setConfirm(null)} onConfirm={confirm.onConfirm} /> : null}
@@ -246,7 +248,7 @@ export default function ExecutorNodePage() {
   }
 
   return (
-    <section className="fp-page">
+    <section className="fp-page fp-executor-page">
       <div className="fp-page__header">
         <div>
           <h1>{t('menuExecutorNode')}</h1>
@@ -260,7 +262,7 @@ export default function ExecutorNodePage() {
       <div className="fp-stat-grid fp-stat-grid--four">
         {page.stats.map((stat) => (
           <div className="fp-stat" key={stat.title}>
-            <div className="fp-stat__icon"><ApiOutlined /></div>
+            <StatIcon stat={stat} />
             <div>
               <span>{stat.title}</span>
               <strong>{stat.value}</strong>
@@ -275,12 +277,16 @@ export default function ExecutorNodePage() {
           {loading ? <span className="fp-muted-text">{t('loading')}</span> : null}
         </div>
         <div className="fp-infra-workspace">
-          <EnvironmentTree
+          <EnvironmentScopeTree
             environments={page.environments}
             regions={page.regions}
             selectedEnvId={query.envId || ''}
             selectedRegionId={query.regionId || ''}
             onSelect={selectScope}
+            title={t('infrastructure.scopeTree')}
+            allLabel={t('infrastructure.allScope')}
+            managementLabel={t('managementRegion')}
+            computeLabel={t('computeRegion')}
           />
           <div className="fp-infra-content">
             <div className="fp-infra-content__bar">
@@ -303,34 +309,19 @@ export default function ExecutorNodePage() {
                 ) : null}
               </div>
             </div>
-            <div className="fp-data-table fp-node-table">
-              <div className="fp-data-table__row fp-data-table__row--head">
-                <span>{t('executor.host')}</span>
-                <span>{t('regionEnv')}</span>
-                <span>{t('infrastructure.region')}</span>
-                <span>{t('executor.source')}</span>
-                <span>{t('executor.sshCapability')}</span>
-                <span>{t('executor.agentCapability')}</span>
-                <span>{t('executor.connectionStatus')}</span>
-                <span>{t('executor.lastTestAt')}</span>
-                <span>{t('operation')}</span>
-              </div>
+            <div className="fp-logical-card-grid">
               {page.nodes.records.length === 0 ? <div className="fp-empty">{t('empty')}</div> : null}
               {page.nodes.records.map((node) => (
-                <div className="fp-data-table__row" key={node.id}>
-                  <button className="fp-node-link" type="button" onClick={() => openDetail(node.id)}>{node.host}</button>
-                  <span>{envIndex[node.envId]?.envName || '-'}</span>
-                  <span>{regionPath(node, regionIndex)}</span>
-                  <span>{sourceLabel(node.sourceType)}</span>
-                  <CapabilityPill active={node.sshSupported} compact />
-                  <CapabilityPill active={node.agentSupported} compact />
-                  <StatusText status={node.connectionStatus} />
-                  <span>{formatTime(node.lastTestAt)}</span>
+                <article className="fp-management-card" key={node.id}>
+                  <div className="fp-management-card__header"><button className="fp-node-link" type="button" onClick={() => openDetail(node.id)}>{node.host}</button><StatusText status={node.connectionStatus} /></div>
+                  <p>{envIndex[node.envId]?.envName || '-'} / {regionPath(node, regionIndex)}</p>
+                  <div className="fp-actions"><CapabilityPill active={node.sshSupported} compact /><CapabilityPill active={node.agentSupported} compact /></div>
+                  <div className="fp-threshold-kv"><div><span>{t('executor.source')}</span><strong>{sourceLabel(node.sourceType)}</strong></div><div><span>{t('executor.lastTestAt')}</span><strong>{formatTime(node.lastTestAt)}</strong></div></div>
                   <div className="fp-actions">
                     <button className="fp-link-button" type="button" onClick={() => openForm(node)}>{t('edit')}</button>
                     <button className="fp-link-button fp-link-button--danger" type="button" onClick={() => requestDelete(node)}>{t('delete')}</button>
                   </div>
-                </div>
+                </article>
               ))}
             </div>
             <Pagination

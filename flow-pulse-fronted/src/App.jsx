@@ -9,6 +9,7 @@ import AlertCenterPage from './features/alert-center/AlertCenterPage';
 import NotificationConfigPage from './features/notification-config/NotificationConfigPage';
 import ThresholdManagementPage from './features/threshold-management/ThresholdManagementPage';
 import DataTopologyPage from './features/data-topology/DataTopologyPage';
+import OverviewPage from './features/overview/OverviewPage';
 import { bindPlatformTheme } from './theme/platformTheme';
 import { t } from './i18n';
 
@@ -16,7 +17,7 @@ const NAV_GROUPS = [
   {
     title: '观测',
     items: [
-      { key: 'overview', labelKey: 'menuOverview', icon: 'overview', disabled: true },
+      { key: 'overview', labelKey: 'menuOverview', icon: 'overview' },
       { key: 'topology', labelKey: 'menuTopology', icon: 'topology' },
       { key: 'alert', labelKey: 'menuAlertCenter', icon: 'alert' },
     ],
@@ -62,13 +63,6 @@ export default function App() {
   return (
     <div className="fp-shell">
       <aside className="fp-sidebar">
-        <div className="fp-brand">
-          <div className="fp-brand__logo">FP</div>
-          <div>
-            <strong>{t('appName')}</strong>
-            <span>{t('appDesc')}</span>
-          </div>
-        </div>
         <nav className="fp-nav">
           {NAV_GROUPS.map((group) => (
             <div className="fp-nav__group-block" key={group.title}>
@@ -76,15 +70,6 @@ export default function App() {
               {group.items.map((item) => {
                 const active = activeMenu === item.key;
                 const className = `fp-nav__item ${active ? 'fp-nav__item--active' : ''} ${item.disabled ? 'fp-nav__item--disabled' : ''}`;
-                if (item.disabled) {
-                  return (
-                    <div className={className} key={item.key}>
-                      <NavIcon name={item.icon} />
-                      <span>{t(item.labelKey)}</span>
-                      <em>建设中</em>
-                    </div>
-                  );
-                }
                 return (
                   <button className={className} type="button" key={item.key} onClick={() => navigate(item.key)}>
                     <NavIcon name={item.icon} />
@@ -98,6 +83,7 @@ export default function App() {
         <div className="fp-sidebar__collapse">{t('collapse')}</div>
       </aside>
       <main className="fp-main">
+        {activeMenu === 'overview' ? <OverviewPage /> : null}
         {activeMenu === 'environment' ? <EnvironmentRegionPage /> : null}
         {activeMenu === 'topology' ? <DataTopologyPage /> : null}
         {activeMenu === 'infrastructure' ? <InfrastructurePage /> : null}
@@ -136,8 +122,12 @@ function NavIcon({ name }) {
 
 function menuFromHash() {
   const value = (window.location.hash || '').replace(/^#\/?/, '');
+  if (value.startsWith('alert-center/')) {
+    return 'alert';
+  }
   const map = {
     'environment-region': 'environment',
+    overview: 'overview',
     environment: 'environment',
     topology: 'topology',
     'data-topology': 'topology',
@@ -162,6 +152,7 @@ function menuFromHash() {
 
 function hashFromMenu(menu) {
   const map = {
+    overview: '/overview',
     environment: '/environment-region',
     topology: '/data-topology',
     infrastructure: '/infrastructure',

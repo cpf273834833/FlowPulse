@@ -438,3 +438,6 @@
     grid-template-columns: 1fr;
   }
 }
+.fp-filter-row.fp-filter-row--logical {
+  grid-template-columns: minmax(320px, 1fr) 180px 180px auto;
+}

@@ -9,6 +9,9 @@ import { environmentRegionApi } from '../../api/environmentRegionApi';
 import { executorNodeApi } from '../../api/executorNodeApi';
 import { metricApi } from '../../api/metricApi';
 import Pagination from '../../components/Pagination';
+import EnvironmentScopeTree from '../../components/EnvironmentScopeTree';
+import SelectControl from '../../components/SelectControl';
+import { StatCards } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
 import { t } from '../../i18n';
 import './CollectionTaskPage.css';
@@ -187,6 +190,10 @@ export default function CollectionTaskPage() {
     );
   }
 
+  const selectedScopeRegion = regionPage.regions.find((item) => item.id === scope.regionId);
+  const selectedScopeEnvironment = regionPage.environments.find((item) => item.id === scope.envId);
+  const scopeLabel = selectedScopeRegion?.regionName || selectedScopeEnvironment?.envName || t('collectionTask.allScope');
+
   return (
     <section className="fp-page fp-collection-task">
       <div className="fp-page__header">
@@ -198,18 +205,24 @@ export default function CollectionTaskPage() {
 
       <Toast message={message} type={messageType} onClose={() => showMessage('')} />
 
-      <div className="fp-stat-grid fp-stat-grid--four fp-metric-stats">
-        {statCards(tasks).map((stat) => (
-          <div className="fp-stat" key={stat.label}>
-            <div className="fp-stat__icon"><stat.Icon /></div>
-            <div>
-              <span>{stat.label}</span>
-              <strong>{stat.value}</strong>
-              <em>{stat.description}</em>
-            </div>
-          </div>
-        ))}
-      </div>
+      <StatCards
+        columns={5}
+        stats={[
+          {
+            key: 'current-scope',
+            title: t('collectionTask.scopeTree'),
+            value: scopeLabel,
+            description: '当前查询范围',
+            kind: 'resource',
+          },
+          ...statCards(tasks).map((stat) => ({
+            key: stat.label,
+            title: stat.label,
+            value: stat.value,
+            description: stat.description,
+          })),
+        ]}
+      />
 
       <div className="fp-task-workbench">
         <ScopePanel
@@ -239,31 +252,18 @@ export default function CollectionTaskPage() {
                   }}
                 />
               </label>
-              <select
-                className="fp-native-select"
+              <SelectControl
                 value={taskQuery.enabled === undefined ? '' : String(taskQuery.enabled)}
-                onChange={(event) => loadTasks({ ...taskQuery, enabled: event.target.value || undefined, pageNo: 1 })}
-              >
-                {STATUS_OPTIONS.map(([value, label]) => <option key={label} value={value}>{t(label)}</option>)}
-              </select>
+                options={STATUS_OPTIONS.map(([value, label]) => [value, t(label)])}
+                onChange={(enabled) => loadTasks({ ...taskQuery, enabled: enabled || undefined, pageNo: 1 })}
+              />
             </div>
           </div>
 
-          <div className="fp-data-table fp-task-table">
-            <div className="fp-data-table__row fp-data-table__row--head">
-              <span>{t('collectionTask.object')}</span>
-              <span>{t('metric.name')}</span>
-              <span>{t('metric.implementation')}</span>
-              <span>{t('metric.executionMode')}</span>
-              <span>{t('metric.interval')}</span>
-              <span>{t('infrastructure.currentMetricValue')}</span>
-              <span>{t('metric.collectStatus')}</span>
-              <span>{t('collectionTask.nextCollectAt')}</span>
-              <span>{t('operation')}</span>
-            </div>
+          <div className="fp-compact-list">
             {tasks.configs.records.map((task) => (
               <div
-                className={`fp-data-table__row ${selectedTaskId === task.id ? 'is-selected' : ''}`}
+                className={`fp-compact-row fp-compact-row--task ${selectedTaskId === task.id ? 'is-selected' : ''}`}
                 role="button"
                 tabIndex={0}
                 key={task.id}
@@ -274,15 +274,14 @@ export default function CollectionTaskPage() {
                   }
                 }}
               >
-                <strong>{task.objectName}<em>{task.objectCode}</em></strong>
-                <span>{task.metricName || '-'}</span>
-                <span>{task.implementationName || t('metric.useDefaultImplementation')}</span>
-                <span>{executionLabel(task.executionMode)}</span>
-                <span>{task.intervalSec || '-'}s</span>
-                <span>{formatMetricValue(task.currentValue)}</span>
+                <div className="fp-compact-row__identity"><strong>{task.objectName}</strong><em>{task.objectCode}</em></div>
+                <div className="fp-compact-row__metric"><span>{task.metricName || '-'}</span><strong>{formatMetricValue(task.currentValue)}</strong></div>
+                <div className="fp-compact-row__datum"><span>{t('metric.implementation')}</span><strong>{task.implementationName || t('metric.useDefaultImplementation')}</strong></div>
+                <div className="fp-compact-row__datum"><span>{t('metric.executionMode')}</span><strong>{executionLabel(task.executionMode)}</strong></div>
+                <div className="fp-compact-row__datum"><span>{t('metric.interval')}</span><strong>{task.intervalSec || '-'}s</strong></div>
+                <div className="fp-compact-row__datum"><span>{t('collectionTask.nextCollectAt')}</span><strong>{formatTime(task.nextCollectAt)}</strong></div>
                 <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
-                <span>{formatTime(task.nextCollectAt)}</span>
-                <span className="fp-row-actions" onClick={(event) => event.stopPropagation()}>
+                <span className="fp-compact-row__actions" onClick={(event) => event.stopPropagation()}>
                   <button type="button" onClick={() => setRoute({ name: 'detail', id: task.id })}>{t('detail')}</button>
                   <button type="button" onClick={() => openEdit(task)}>{t('collectionTask.config')}</button>
                 </span>
@@ -303,42 +302,8 @@ export default function CollectionTaskPage() {
 }
 
 function ScopePanel({ environments, regions, scope, onSelect }) {
-  const managementRegions = regions.filter((region) => region.regionType === 'MANAGEMENT');
-
   return (
-    <aside className="fp-infra-tree fp-task-scope">
-      <strong className="fp-infra-tree__title">{t('collectionTask.scopeTree')}</strong>
-      <button className={!scope.envId && !scope.regionId ? 'is-active' : ''} type="button" onClick={() => onSelect({})}>
-        <span>{t('collectionTask.allScope')}</span>
-        <em>{t('collectionTask.allTask')}</em>
-      </button>
-      {environments.map((environment) => (
-        <div className="fp-tree-group" key={environment.id}>
-          <button className={scope.envId === environment.id && !scope.regionId ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id })}>
-            <span>{environment.envName}</span>
-            <em>{environment.envCode}</em>
-          </button>
-          <div className="fp-tree-children">
-            {managementRegions.filter((region) => region.envId === environment.id).map((management) => (
-              <div className="fp-tree-management" key={management.id}>
-                <button className={scope.regionId === management.id ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: management.id })}>
-                  <span>{management.regionName}</span>
-                </button>
-                <div className="fp-tree-computes">
-                  {regions.filter((region) => region.parentRegionId === management.id).map((compute) => (
-                    <div className="fp-tree-compute" key={compute.id}>
-                      <button className={scope.regionId === compute.id ? 'is-active' : ''} type="button" onClick={() => onSelect({ envId: environment.id, regionId: compute.id })}>
-                        <span>{compute.regionName}</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </aside>
+    <EnvironmentScopeTree environments={environments} regions={regions} selectedEnvId={scope.envId} selectedRegionId={scope.regionId} onSelect={(envId, regionId) => onSelect({ envId: envId || undefined, regionId: regionId || undefined })} title={t('collectionTask.scopeTree')} allLabel={t('collectionTask.allScope')} allHint={t('collectionTask.allTask')} managementLabel={t('managementRegion')} computeLabel={t('computeRegion')} className="fp-task-scope" />
   );
 }
 

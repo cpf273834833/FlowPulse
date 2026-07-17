@@ -13,6 +13,7 @@ import SearchOutlined from '@uyun/icons/SearchOutlined';
 import SettingOutlined from '@uyun/icons/SettingOutlined';
 import { environmentRegionApi } from '../../api/environmentRegionApi';
 import Modal from '../../components/Modal';
+import { StatCards } from '../../components/PageChrome';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Toast from '../../components/Toast';
 import { t } from '../../i18n';
@@ -254,21 +255,19 @@ export default function EnvironmentRegionPage() {
 
       <Toast message={message} onClose={() => setMessage('')} />
 
-      <div className="fp-stat-grid fp-stat-grid--four">
-        {page.stats.map((stat, index) => {
-          const Icon = STAT_ICONS[index % STAT_ICONS.length];
-          return (
-            <div className="fp-stat" key={stat.title}>
-              <div className="fp-stat__icon"><Icon /></div>
-              <div>
-                <span>{stat.title}</span>
-                <strong>{stat.value}</strong>
-                <em>{stat.description}</em>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <StatCards
+        columns={5}
+        stats={[
+          {
+            key: 'current-scope',
+            title: t('pageTitle'),
+            value: selectedEnvironment?.envName || t('environmentList'),
+            description: '当前统计范围',
+            kind: 'resource',
+          },
+          ...page.stats.map((stat) => ({ ...stat, key: stat.title })),
+        ]}
+      />
 
       <div className="fp-workspace">
         <aside className="fp-env-list-panel">
@@ -283,7 +282,7 @@ export default function EnvironmentRegionPage() {
             </button>
           </div>
           <div className="fp-env-list">
-            {filteredEnvironments.length === 0 ? <div className="fp-empty fp-empty--small">{t('empty')}</div> : null}
+            {!loading && filteredEnvironments.length === 0 ? <div className="fp-empty fp-empty--small">{t('empty')}</div> : null}
             {filteredEnvironments.map((environment) => {
               const envManagementCount = page.regions.filter((region) => region.envId === environment.id && region.regionType === 'MANAGEMENT').length;
               const envComputeCount = page.regions.filter((region) => region.envId === environment.id && region.regionType === 'COMPUTE').length;
@@ -308,7 +307,7 @@ export default function EnvironmentRegionPage() {
 
         <div className="fp-env-detail-panel">
           {loading ? <div className="fp-card__loading">{t('loading')}</div> : null}
-          {!selectedEnvironment ? <div className="fp-empty">{t('empty')}</div> : null}
+          {!loading && !selectedEnvironment ? <div className="fp-empty">{t('empty')}</div> : null}
 
           {selectedEnvironment ? (
             <article className="fp-env-detail">

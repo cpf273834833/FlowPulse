@@ -2,6 +2,25 @@
   min-width: 0;
 }
 
+:root[data-flowpulse-theme='light'] .fp-threshold-condition-editor {
+  border-color: #dce3ec;
+  background: #f7f9fc;
+}
+
+:root[data-flowpulse-theme='light'] .fp-threshold-condition-editor__head span { color: var(--fp-heading); }
+
+:root[data-flowpulse-theme='light'] .fp-threshold-condition-row {
+  border-color: #dfe6ef;
+  background: #fff;
+}
+
+:root[data-flowpulse-theme='light'] .fp-threshold-condition-row select,
+:root[data-flowpulse-theme='light'] .fp-threshold-condition-row input {
+  border-color: #d8e0ea;
+  color: var(--fp-text);
+  background-color: #fff;
+}
+
 .fp-threshold-board {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;

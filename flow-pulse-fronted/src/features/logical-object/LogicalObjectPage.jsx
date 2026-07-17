@@ -4,6 +4,7 @@ import { environmentRegionApi } from '../../api/environmentRegionApi';
 import { infrastructureApi } from '../../api/infrastructureApi';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
+import SelectControl from '../../components/SelectControl';
 import { StatCards } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
 import './LogicalObjectPage.css';
@@ -105,6 +106,7 @@ export default function LogicalObjectPage() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [toast, setToast] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  const [resolvingId, setResolvingId] = useState('');
 
   const regionOptions = useMemo(() => regions.filter((region) => !form.envId || region.envId === form.envId), [regions, form.envId]);
   const sourceInfrastructures = useMemo(() => infrastructures.filter((item) => !form.sourceType || item.type === form.sourceType), [infrastructures, form.sourceType]);
@@ -206,6 +208,22 @@ export default function LogicalObjectPage() {
     }
   }
 
+  async function resolveItem(item) {
+    if (!item || resolvingId) return;
+    setResolvingId(item.id);
+    try {
+      const resolved = await logicalObjectApi.resolve(item.id);
+      setSelected(resolved);
+      setToast({ type: 'success', title: '实例解析完成', message: `${resolved.objectName} 当前匹配 ${resolved.instanceCount || 0} 个实例。` });
+      await loadInstances(item.id, { pageNo: 1, pageSize: instanceQuery.pageSize, keyword: '' });
+      await loadPage(query);
+    } catch (error) {
+      setToast({ type: 'error', title: '实例解析失败', message: error.message });
+    } finally {
+      setResolvingId('');
+    }
+  }
+
   function applyAggregationTemplate(type = form.objectType) {
     const template = AGGREGATION_TEMPLATES[type];
     if (!template) {
@@ -295,7 +313,7 @@ export default function LogicalObjectPage() {
       <StatCards stats={logicalObjectStats(page.records, page.total)} />
       <section className="fp-logical-layout fp-logical-layout--single">
         <main className="fp-card fp-logical-main">
-          <div className="fp-filter-row">
+          <div className="fp-filter-row fp-filter-row--logical">
             <label className="fp-inline-search"><span>⌕</span><input value={query.keyword} placeholder="搜索名称、编码、匹配表达式" onChange={(event) => setQuery({ ...query, keyword: event.target.value })} onKeyDown={(event) => event.key === 'Enter' && loadPage({ ...query, pageNo: 1 })} /></label>
             <SelectBare value={query.objectType} options={[['', '全部类型']].concat(OBJECT_TYPES)} onChange={(objectType) => loadPage({ ...query, pageNo: 1, objectType })} />
             <SelectBare value={query.sourceType} options={[['', '全部来源']].concat(SOURCE_TYPES)} onChange={(sourceType) => loadPage({ ...query, pageNo: 1, sourceType })} />
@@ -311,6 +329,7 @@ export default function LogicalObjectPage() {
                   <div className="fp-logical-meta"><span>实例 {item.instanceCount || 0}</span><span>活跃 {item.activeInstanceCount || 0}</span><span>{item.enabled ? '启用' : '停用'}</span></div>
                 </button>
                 <div className="fp-actions">
+                  <button className="fp-link-button" type="button" disabled={resolvingId === item.id} onClick={() => resolveItem(item)}>{resolvingId === item.id ? '解析中...' : '解析实例'}</button>
                   <button className="fp-link-button" type="button" onClick={() => openEdit(item)}>编辑</button>
                   <button className="fp-link-button fp-link-button--danger" type="button" onClick={() => requestDelete(item)}>删除</button>
                 </div>
@@ -462,7 +481,7 @@ function SelectField({ label, value, options, onChange }) {
 }
 
 function SelectBare({ value, options, onChange }) {
-  return <select className="fp-native-select" value={value || ''} onChange={(event) => onChange(event.target.value)}>{options.map(([optionValue, labelText]) => <option value={optionValue} key={optionValue}>{labelText}</option>)}</select>;
+  return <SelectControl className="fp-select-bare" value={value || ''} options={options} onChange={onChange} />;
 }
 
 function TextArea({ label, value, onChange, placeholder = '' }) {
@@ -544,9 +563,9 @@ function logicalObjectStats(records, total) {
   const instances = records.reduce((sum, item) => sum + Number(item.instanceCount || 0), 0);
   const activeInstances = records.reduce((sum, item) => sum + Number(item.activeInstanceCount || 0), 0);
   return [
-    { key: 'total', title: '逻辑对象', value: total || records.length, description: '稳定监控对象', icon: 'L' },
-    { key: 'enabled', title: '启用对象', value: enabled, description: '可用于拓扑与监控', icon: '✓', tone: 'success' },
-    { key: 'instances', title: '解析实例', value: instances, description: '匹配到的物理对象', icon: 'R' },
-    { key: 'active', title: '活跃实例', value: activeInstances, description: '最近仍在运行或出现', icon: 'A', tone: activeInstances ? 'success' : 'muted' },
+    { key: 'total', title: '逻辑对象', value: total || records.length, description: '稳定监控对象' },
+    { key: 'enabled', title: '启用对象', value: enabled, description: '可用于拓扑与监控', tone: 'success' },
+    { key: 'instances', title: '解析实例', value: instances, description: '匹配到的物理对象' },
+    { key: 'active', title: '活跃实例', value: activeInstances, description: '最近仍在运行或出现', tone: activeInstances ? 'success' : 'muted' },
   ];
 }

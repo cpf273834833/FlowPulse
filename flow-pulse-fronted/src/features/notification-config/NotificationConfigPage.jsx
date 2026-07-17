@@ -107,7 +107,14 @@ export default function NotificationConfigPage() {
       </header>
       <StatCards stats={notificationStats(channels)} />
       <section className="fp-notify-grid">
-        {channels.length === 0 ? <div className="fp-empty">暂无通知渠道</div> : null}
+        {channels.length === 0 ? (
+          <div className="fp-empty-state fp-notify-empty">
+            <span className="fp-empty-state__icon" aria-hidden="true">⌁</span>
+            <strong>尚未配置通知渠道</strong>
+            <p>添加第三方通知平台接口，让告警级别变化能够及时送达。</p>
+            <button className="fp-button fp-button--primary" type="button" onClick={openCreate}>新增通知渠道</button>
+          </div>
+        ) : null}
         {channels.map((channel) => (
           <article className="fp-notify-card" key={channel.id}>
             <div className="fp-notify-card__head">
@@ -137,9 +144,9 @@ function notificationStats(channels) {
   const enabled = channels.filter((item) => item.enabled).length;
   const thirdParty = channels.filter((item) => item.channelType === 'THIRD_PARTY').length;
   return [
-    { key: 'total', title: '通知渠道', value: channels.length, description: '已维护的通知出口', icon: 'N' },
-    { key: 'enabled', title: '启用渠道', value: enabled, description: '可用于告警通知', icon: '✓', tone: 'success' },
-    { key: 'disabled', title: '停用渠道', value: channels.length - enabled, description: '暂不发送通知', icon: '!' },
-    { key: 'thirdParty', title: '第三方平台', value: thirdParty, description: '接口通知平台', icon: 'API' },
+    { key: 'total', title: '通知渠道', value: channels.length, description: '已维护的通知出口' },
+    { key: 'enabled', title: '启用渠道', value: enabled, description: '可用于告警通知', tone: 'success' },
+    { key: 'disabled', title: '停用渠道', value: channels.length - enabled, description: '暂不发送通知' },
+    { key: 'thirdParty', title: '第三方平台', value: thirdParty, description: '接口通知平台' },
   ];
 }

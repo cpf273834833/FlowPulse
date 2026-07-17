@@ -4,6 +4,8 @@ import PlusOutlined from '@uyun/icons/PlusOutlined';
 import SearchOutlined from '@uyun/icons/SearchOutlined';
 import { metricApi } from '../../api/metricApi';
 import Pagination from '../../components/Pagination';
+import SelectControl from '../../components/SelectControl';
+import { StatIcon } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
 import { t } from '../../i18n';
 
@@ -217,7 +219,7 @@ export default function MetricCenterPage() {
         </div>
       ) : null}
       <div className="fp-stat-grid fp-stat-grid--four fp-metric-stats">
-        {stats.map((stat) => <div className="fp-stat" key={stat.title}><div className="fp-stat__icon"><ApiOutlined /></div><div><span>{stat.title}</span><strong>{stat.value}</strong><em>{stat.description}</em></div></div>)}
+        {stats.map((stat) => <div className="fp-stat" key={stat.title}><StatIcon stat={stat} /><div><span>{stat.title}</span><strong>{stat.value}</strong><em>{stat.description}</em></div></div>)}
       </div>
       <div className="fp-metric-workbench">
         <section className="fp-card fp-metric-workbench__main">
@@ -249,19 +251,18 @@ function DefinitionList({ page, query, selectedId, onQuery, onLoad, onSelect, on
         <SelectBare value={query.enabled || ''} options={ENABLED_OPTIONS} onChange={(enabled) => onQuery({ ...query, enabled, pageNo: 1 })} />
         <button className="fp-button" type="button" onClick={() => onLoad({ ...query, pageNo: 1 })}>{t('filter')}</button>
       </div>
-      <div className="fp-data-table fp-metric-table fp-metric-table--polished">
-        <div className="fp-data-table__row fp-data-table__row--head"><span>{t('metric.name')}</span><span>{t('metric.objectType')}</span><span>{t('metric.unit')}</span><span>{t('metric.implementationCount')}</span><span>{t('metric.mappingStatus')}</span><span>{t('metric.status')}</span><span>{t('operation')}</span></div>
+      <div className="fp-compact-list">
         {page.metrics.records.length === 0 ? <div className="fp-empty">{t('empty')}</div> : null}
         {page.metrics.records.map((metric) => (
-          <div className={`fp-data-table__row ${selectedId === metric.id ? 'is-selected' : ''}`} key={metric.id} onClick={() => onSelect(metric.id)}>
-            <button className="fp-node-link" type="button" onClick={(event) => { event.stopPropagation(); onOpen(metric); }}>{metric.metricName}<em>{metric.metricCode}</em></button>
-            <span><Tag>{labelOf(CATEGORY_OPTIONS, metric.metricCategory)}</Tag><Tag muted>{labelOf(OBJECT_TYPE_OPTIONS, metric.objectType)}</Tag></span>
-            <span>{metric.valueUnit || '-'}</span>
-            <span><button className="fp-count-link" type="button" onClick={(event) => { event.stopPropagation(); onOpen(metric); }}>{metric.implementationCount || 0}</button></span>
-            <MappingPill mapped={hasMapping(metric)} />
-            <span>{metric.systemBuiltin ? <Tag success>内置</Tag> : <StatusPill enabled={metric.enabled} />}</span>
-            <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); onOpen(metric); }}>{t('detail')}</button>
-          </div>
+          <article className={`fp-compact-row fp-compact-row--metric ${selectedId === metric.id ? 'is-selected' : ''}`} key={metric.id} role="button" tabIndex={0} onClick={() => onSelect(metric.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelect(metric.id); }}>
+            <button className="fp-compact-row__identity fp-node-link" type="button" onClick={(event) => { event.stopPropagation(); onOpen(metric); }}>{metric.metricName}<em>{metric.metricCode}</em></button>
+            <div className="fp-compact-row__tags"><Tag>{labelOf(CATEGORY_OPTIONS, metric.metricCategory)}</Tag><Tag muted>{labelOf(OBJECT_TYPE_OPTIONS, metric.objectType)}</Tag></div>
+            <CompactDatum label={t('metric.unit')} value={metric.valueUnit || '-'} />
+            <CompactDatum label={t('metric.implementationCount')} value={metric.implementationCount || 0} />
+            <div className="fp-compact-row__datum"><span>{t('metric.mappingStatus')}</span><MappingPill mapped={hasMapping(metric)} /></div>
+            <div className="fp-compact-row__status">{metric.systemBuiltin ? <Tag success>内置</Tag> : <StatusPill enabled={metric.enabled} />}</div>
+            <div className="fp-compact-row__actions"><button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); onOpen(metric); }}>{t('detail')}</button></div>
+          </article>
         ))}
       </div>
       <Pagination pageNo={page.metrics.pageNo} pageSize={page.metrics.pageSize} total={page.metrics.total} onChange={(next) => onLoad({ ...query, ...next })} />
@@ -279,24 +280,27 @@ function ImplementationList({ page, metrics, query, selectedId, onQuery, onLoad,
         <SelectBare value={query.enabled || ''} options={ENABLED_OPTIONS} onChange={(enabled) => onQuery({ ...query, enabled, pageNo: 1 })} />
         <button className="fp-button" type="button" onClick={() => onLoad({ ...query, pageNo: 1 })}>{t('filter')}</button>
       </div>
-      <div className="fp-data-table fp-implementation-table fp-metric-table--polished">
-        <div className="fp-data-table__row fp-data-table__row--head"><span>{t('metric.implementation')}</span><span>{t('metric.name')}</span><span>{t('metric.implType')}</span><span>{t('metric.executionMode')}</span><span>{t('metric.defaultImplementation')}</span><span>{t('metric.status')}</span><span>{t('operation')}</span></div>
+      <div className="fp-compact-list">
         {page.implementations.records.length === 0 ? <div className="fp-empty">{t('empty')}</div> : null}
         {page.implementations.records.map((item) => (
-          <div className={`fp-data-table__row ${selectedId === item.id ? 'is-selected' : ''}`} key={item.id} onClick={() => onSelect(item.id)}>
-            <button className="fp-node-link" type="button" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.implementationName}<em>{item.implementationCode}</em></button>
-            <span>{item.metricName}<em>{item.metricCode}</em></span>
-            <span>{labelOf(IMPLEMENTATION_TYPE_OPTIONS, item.implementationType)}</span>
-            <span>{item.executionMode}</span>
-            <span>{item.defaultImplementation ? <Tag success>{t('yes')}</Tag> : <Tag muted>{t('no')}</Tag>}</span>
-            <span>{item.systemBuiltin ? <Tag success>内置</Tag> : <StatusPill enabled={item.enabled} />}</span>
-            <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{t('detail')}</button>
-          </div>
+          <article className={`fp-compact-row fp-compact-row--implementation ${selectedId === item.id ? 'is-selected' : ''}`} key={item.id} role="button" tabIndex={0} onClick={() => onSelect(item.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelect(item.id); }}>
+            <button className="fp-compact-row__identity fp-node-link" type="button" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.implementationName}<em>{item.implementationCode}</em></button>
+            <CompactDatum label={t('metric.name')} value={`${item.metricName || '-'} / ${item.metricCode || '-'}`} />
+            <CompactDatum label={t('metric.implType')} value={labelOf(IMPLEMENTATION_TYPE_OPTIONS, item.implementationType)} />
+            <CompactDatum label={t('metric.executionMode')} value={item.executionMode} />
+            <CompactDatum label={t('metric.defaultImplementation')} value={item.defaultImplementation ? t('yes') : t('no')} />
+            <div className="fp-compact-row__status">{item.systemBuiltin ? <Tag success>内置</Tag> : <StatusPill enabled={item.enabled} />}</div>
+            <div className="fp-compact-row__actions"><button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{t('detail')}</button></div>
+          </article>
         ))}
       </div>
       <Pagination pageNo={page.implementations.pageNo} pageSize={page.implementations.pageSize} total={page.implementations.total} onChange={(next) => onLoad({ ...query, ...next })} />
     </>
   );
+}
+
+function CompactDatum({ label, value }) {
+  return <div className="fp-compact-row__datum"><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function MetricContextPanel({ activeTab, metric, implementation, implementations, onDetailMetric, onEditMetric, onDetailImplementation, onEditImplementation, onAddImplementation }) {
@@ -595,7 +599,7 @@ function HelpTextArea({ label, value, onChange, placeholder, helpTitle, helpText
   );
 }
 function SelectField({ label, value, options, onChange }) { return <label className="fp-field"><span>{label}</span><select value={value || ''} onChange={(event) => onChange(event.target.value)}>{options.map(([optionValue, label]) => <option key={optionValue} value={optionValue}>{formatLabel(label)}</option>)}</select></label>; }
-function SelectBare({ value, options, onChange }) { return <select className="fp-native-select" value={value || ''} onChange={(event) => onChange(event.target.value)}>{options.map(([optionValue, label]) => <option key={optionValue} value={optionValue}>{formatLabel(label)}</option>)}</select>; }
+function SelectBare({ value, options, onChange }) { return <SelectControl className="fp-select-bare" value={value || ''} options={options.map(([optionValue, label]) => [optionValue, formatLabel(label)])} onChange={onChange} />; }
 function StatusPill({ enabled }) { return <span className={`fp-status-pill ${enabled ? 'fp-status-pill--normal' : ''}`}>{enabled ? t('metric.enabled') : t('metric.disabled')}</span>; }
 function hasMapping(metric) { return Boolean(metric && metric.mappingJson && metric.mappingJson.trim && metric.mappingJson.trim().length > 0); }
 function labelOf(options, value) { const item = options.find(([optionValue]) => optionValue === value); return item ? formatLabel(item[1]) : value || '-'; }

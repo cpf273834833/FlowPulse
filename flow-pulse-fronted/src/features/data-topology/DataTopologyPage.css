@@ -86,7 +86,7 @@
 
 .fp-topology-list-layout {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   gap: 14px;
   align-items: start;
   min-height: calc(100vh - 190px);
@@ -2159,4 +2159,220 @@
 .fp-topology-side .fp-topology-metric-card small {
   grid-column: 1 / -1;
   font-size: 11px;
+}
+
+.fp-topology-save-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fp-topology-save-state.is-saved {
+  color: #237a57;
+  background: #eaf8f1;
+}
+
+.fp-topology-save-state.is-dirty {
+  color: #ad6800;
+  background: #fff7e6;
+}
+
+/* Topology editor follows the Portal light workspace instead of forcing a dark studio. */
+:root[data-flowpulse-theme='light'] .fp-topology-canvas-header {
+  border-color: #dce3ec;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(31, 58, 94, .05);
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-canvas-title h1,
+:root[data-flowpulse-theme='light'] .fp-topology-panel-title h2,
+:root[data-flowpulse-theme='light'] .fp-topology-toolbar__hint strong,
+:root[data-flowpulse-theme='light'] .fp-topology-empty-canvas strong {
+  color: var(--fp-heading);
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-canvas-layout .fp-topology-stage,
+:root[data-flowpulse-theme='light'] .fp-topology-side,
+:root[data-flowpulse-theme='light'] .fp-topology-left,
+:root[data-flowpulse-theme='light'] .fp-topology-stage,
+:root[data-flowpulse-theme='light'] .fp-topology-inspector {
+  border-color: #dce3ec;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(31, 58, 94, .05);
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-tabs,
+:root[data-flowpulse-theme='light'] .fp-topology-toolbar {
+  border-color: #e2e8f0;
+  background: #fff;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-tabs button,
+:root[data-flowpulse-theme='light'] .fp-resource-segment button,
+:root[data-flowpulse-theme='light'] .fp-topology-list__item,
+:root[data-flowpulse-theme='light'] .fp-topology-resource {
+  border-color: #dfe6ef;
+  color: var(--fp-text);
+  background: #f7f9fc;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-tabs button.is-active,
+:root[data-flowpulse-theme='light'] .fp-resource-segment button.is-active {
+  border-color: color-mix(in srgb, var(--fp-primary) 55%, #dce3ec);
+  color: var(--fp-primary);
+  background: color-mix(in srgb, var(--fp-primary) 8%, #fff);
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-resource strong { color: var(--fp-heading); }
+
+:root[data-flowpulse-theme='light'] .fp-topology-canvas {
+  background:
+    linear-gradient(rgba(85, 118, 154, .09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(85, 118, 154, .09) 1px, transparent 1px),
+    #f5f8fc;
+  background-size: 28px 28px, 28px 28px, auto;
+}
+
+:root[data-flowpulse-theme='light'] .fp-canvas-view-toolbar,
+:root[data-flowpulse-theme='light'] .fp-canvas-controls {
+  border-color: #d8e1ec;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 8px 20px rgba(31, 58, 94, .1);
+}
+
+:root[data-flowpulse-theme='light'] .fp-canvas-view-toolbar button,
+:root[data-flowpulse-theme='light'] .fp-canvas-controls button,
+:root[data-flowpulse-theme='light'] .fp-canvas-controls span {
+  border-color: #dce3ec;
+  color: #405268;
+  background: #f7f9fc;
+}
+
+:root[data-flowpulse-theme='light'] .fp-canvas-view-toolbar button.is-active {
+  border-color: var(--fp-primary);
+  color: #fff;
+  background: var(--fp-primary);
+}
+
+:root[data-flowpulse-theme='light'] .fp-canvas-view-toolbar strong { color: var(--fp-heading); }
+
+:root[data-flowpulse-theme='light'] .fp-topology-node-card {
+  fill: #fff;
+  stroke: color-mix(in srgb, var(--fp-primary) 45%, #cfd9e5);
+  filter: drop-shadow(0 7px 12px rgba(31, 58, 94, .12));
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-node text { fill: #26384d; }
+:root[data-flowpulse-theme='light'] .fp-topology-node .fp-node-sub { fill: #708197; }
+
+:root[data-flowpulse-theme='light'] .fp-topology-empty-canvas {
+  border-color: #cfd9e5;
+  background: rgba(255, 255, 255, .88);
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-card {
+  border-color: #dce3ec;
+  background: #fff;
+  box-shadow: none;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-card:hover {
+  border-color: color-mix(in srgb, var(--fp-primary) 48%, #dce3ec);
+  background: #f8fbff;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-card__head strong { color: var(--fp-heading); }
+:root[data-flowpulse-theme='light'] .fp-topology-card__head span { color: #5279a5; }
+:root[data-flowpulse-theme='light'] .fp-topology-card__head em {
+  border-color: #cfe2fa;
+  color: #3377bf;
+  background: #eef6ff;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-card__meta span {
+  border-color: #e1e7ef;
+  color: #56667a;
+  background: #f6f8fb;
+}
+
+:root[data-flowpulse-theme='light'] .fp-inspector-tabs,
+:root[data-flowpulse-theme='light'] .fp-topology-info-box,
+:root[data-flowpulse-theme='light'] .fp-topology-config-item,
+:root[data-flowpulse-theme='light'] .fp-topology-inline-form,
+:root[data-flowpulse-theme='light'] .fp-topology-metric-summary,
+:root[data-flowpulse-theme='light'] .fp-threshold-mini-row,
+:root[data-flowpulse-theme='light'] .fp-topology-metric-runtime > *,
+:root[data-flowpulse-theme='light'] .fp-topology-threshold-summary,
+:root[data-flowpulse-theme='light'] .fp-topology-param-designer,
+:root[data-flowpulse-theme='light'] .fp-placeholder-rule {
+  border-color: #dce3ec;
+  color: var(--fp-text);
+  background: #f6f8fb;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-info-box strong,
+:root[data-flowpulse-theme='light'] .fp-topology-config-item strong,
+:root[data-flowpulse-theme='light'] .fp-topology-metric-summary strong,
+:root[data-flowpulse-theme='light'] .fp-topology-param-designer strong {
+  color: var(--fp-heading);
+}
+
+/* Inspector content must remain readable in the light workspace. */
+:root[data-flowpulse-theme='light'] .fp-topology-inspector__head h2,
+:root[data-flowpulse-theme='light'] .fp-topology-config-head strong,
+:root[data-flowpulse-theme='light'] .fp-topology-metric-card strong,
+:root[data-flowpulse-theme='light'] .fp-topology-alert-empty strong {
+  color: #24364b;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-inspector__head p,
+:root[data-flowpulse-theme='light'] .fp-topology-config-head span,
+:root[data-flowpulse-theme='light'] .fp-topology-metric-card span,
+:root[data-flowpulse-theme='light'] .fp-topology-metric-card small,
+:root[data-flowpulse-theme='light'] .fp-topology-alert-empty span {
+  color: #65758a;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-metric-summary div {
+  border-color: #dce3ec;
+  background: #f6f8fb;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-metric-card {
+  border-color: #dce3ec;
+  color: #31445a;
+  background: #fff;
+  box-shadow: none;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-metric-card:hover,
+:root[data-flowpulse-theme='light'] .fp-topology-metric-card.is-enabled {
+  border-color: color-mix(in srgb, var(--fp-primary) 42%, #dce3ec);
+  background: #f8fbff;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-metric-card.is-disabled {
+  opacity: 1;
+  background: #f7f9fc;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-alert-empty {
+  border-color: #cfd9e5;
+  color: #65758a;
+  background: #f7f9fc;
+}
+
+:root[data-flowpulse-theme='light'] .fp-topology-editor input,
+:root[data-flowpulse-theme='light'] .fp-topology-editor select,
+:root[data-flowpulse-theme='light'] .fp-topology-editor textarea,
+:root[data-flowpulse-theme='light'] .fp-topology-param-designer input,
+:root[data-flowpulse-theme='light'] .fp-topology-param-designer select {
+  border-color: #d8e0ea;
+  color: var(--fp-text);
+  background-color: #fff;
 }

@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { alertApi } from '../../api/alertApi';
 import Pagination from '../../components/Pagination';
+import SelectControl from '../../components/SelectControl';
+import { StatIcon } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
 import './AlertCenterPage.css';
 
 const DEFAULT_QUERY = { pageNo: 1, pageSize: 10, keyword: '', level: '', status: 'ACTIVE' };
+const ALERT_LEVEL_OPTIONS = [['', '全部级别'], ['REMIND', '提醒'], ['WARNING', '警告'], ['ERROR', '错误'], ['CRITICAL', '紧急'], ['UNKNOWN', '未知']];
 
 export default function AlertCenterPage() {
   const [query, setQuery] = useState(DEFAULT_QUERY);
   const [page, setPage] = useState({ records: [], total: 0, pageNo: 1, pageSize: 10 });
   const [stats, setStats] = useState([]);
+  const [detailId, setDetailId] = useState(detailIdFromHash());
   const [selected, setSelected] = useState(null);
   const [events, setEvents] = useState([]);
   const [toast, setToast] = useState(null);
@@ -18,20 +22,38 @@ export default function AlertCenterPage() {
     loadPage(query);
   }, [query.pageNo, query.pageSize]);
 
+  useEffect(() => {
+    function syncDetail() {
+      setDetailId(detailIdFromHash());
+    }
+    window.addEventListener('hashchange', syncDetail);
+    return () => window.removeEventListener('hashchange', syncDetail);
+  }, []);
+
+  useEffect(() => {
+    if (detailId) {
+      loadDetail(detailId);
+    } else {
+      setSelected(null);
+      setEvents([]);
+    }
+  }, [detailId]);
+
   async function loadPage(nextQuery = query) {
     const response = await alertApi.page(nextQuery);
     const alerts = response.alerts || { records: [], total: 0, pageNo: nextQuery.pageNo, pageSize: nextQuery.pageSize };
     setPage(alerts);
     setStats(response.stats || []);
-    if (!selected && alerts.records.length > 0) {
-      openDetail(alerts.records[0]);
-    }
   }
 
-  async function openDetail(alert) {
-    const response = await alertApi.detail(alert.id);
+  async function loadDetail(id) {
+    const response = await alertApi.detail(id);
     setSelected(response.alert);
     setEvents(response.events || []);
+  }
+
+  function openDetail(alert) {
+    window.location.hash = `/alert-center/${encodeURIComponent(alert.id)}`;
   }
 
   async function acknowledge() {
@@ -56,6 +78,48 @@ export default function AlertCenterPage() {
     loadPage(nextQuery);
   }
 
+  if (detailId) {
+    return (
+      <div className="fp-page">
+        <header className="fp-page__header fp-alert-detail-header">
+          <div>
+            <button className="fp-alert-back" type="button" onClick={() => { window.location.hash = '/alert-center'; }}>← 返回告警中心</button>
+            <h1>{selected?.objectName || selected?.objectCode || '告警详情'}</h1>
+            <p>{selected?.message || '查看本次故障的触发、升级、确认与恢复过程。'}</p>
+          </div>
+          {selected ? <Level value={selected.currentLevel} /> : null}
+        </header>
+
+        <section className="fp-card fp-alert-detail-summary">
+          <DetailDatum label="当前级别"><Level value={selected?.currentLevel} /></DetailDatum>
+          <DetailDatum label="前一等级" value={levelText(selected?.previousLevel)} />
+          <DetailDatum label="触发值" value={selected?.triggerValue ?? '-'} />
+          <DetailDatum label="首次触发" value={formatTime(selected?.firstTriggeredAt)} />
+          <DetailDatum label="确认状态" value={selected?.acknowledged ? '已确认' : '未确认'} />
+          <DetailDatum label="恢复时间" value={formatTime(selected?.recoveredAt)} />
+          <div className="fp-alert-detail-summary__action">
+            <button className="fp-button fp-button--primary" type="button" disabled={!selected || selected.acknowledged} onClick={acknowledge}>确认故障</button>
+          </div>
+        </section>
+
+        <section className="fp-card">
+          <div className="fp-section-heading"><div><h2>故障过程</h2><p>按时间查看级别变化和处理轨迹。</p></div></div>
+          <div className="fp-alert-event-list">
+            {events.length === 0 ? <div className="fp-empty">暂无故障过程记录</div> : null}
+            {events.map((event) => (
+              <div className="fp-alert-event" key={event.id}>
+                <span className="fp-alert-event__marker" />
+                <div><strong>{levelText(event.fromLevel)} → {levelText(event.toLevel)}</strong><p>{event.message || event.eventType}</p></div>
+                <time>{formatTime(event.eventAt)}</time>
+              </div>
+            ))}
+          </div>
+        </section>
+        {toast ? <Toast {...toast} onClose={() => setToast(null)} /> : null}
+      </div>
+    );
+  }
+
   return (
     <div className="fp-page">
       <header className="fp-page__header">
@@ -68,14 +132,13 @@ export default function AlertCenterPage() {
       <section className="fp-stat-grid fp-stat-grid--four">
         {(stats.length ? stats : defaultStats()).map((item) => (
           <div className="fp-stat" key={item.title}>
-            <span className="fp-stat__icon">A</span>
+            <StatIcon stat={item} />
             <div><span>{item.title}</span><strong>{item.value}</strong><em>{item.description}</em></div>
           </div>
         ))}
       </section>
 
-      <section className="fp-alert-board">
-        <div className="fp-card">
+      <section className="fp-card">
           <div className="fp-alert-status-tabs">
             <button className={query.status === 'ACTIVE' ? 'is-active' : ''} type="button" onClick={() => switchStatus('ACTIVE')}>
               <strong>活动告警</strong>
@@ -90,70 +153,44 @@ export default function AlertCenterPage() {
               <span>按故障记录统一查看</span>
             </button>
           </div>
-          <div className="fp-filter-row fp-filter-row--metric">
+          <div className="fp-filter-row fp-filter-row--alert">
             <label className="fp-inline-search">
-              <span>⌕</span>
+              <svg className="fp-inline-search__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5" /><path d="m15 15 4 4" /></svg>
               <input value={query.keyword} placeholder="搜索对象、消息或故障键" onChange={(event) => setQuery({ ...query, keyword: event.target.value })} onKeyDown={(event) => event.key === 'Enter' && search()} />
             </label>
-            <select className="fp-native-select" value={query.level} onChange={(event) => setQuery({ ...query, pageNo: 1, level: event.target.value })}>
-              <option value="">全部级别</option><option value="REMIND">提醒</option><option value="WARNING">警告</option><option value="ERROR">错误</option><option value="CRITICAL">紧急</option><option value="UNKNOWN">未知</option>
-            </select>
+            <SelectControl value={query.level} options={ALERT_LEVEL_OPTIONS} onChange={(level) => setQuery({ ...query, pageNo: 1, level })} />
             <button className="fp-button" type="button" onClick={search}>筛选</button>
           </div>
 
-          <div className="fp-data-table fp-alert-table">
-            <div className="fp-data-table__row fp-data-table__row--head"><span>故障对象</span><span>最高级别</span><span>闭环状态</span><span>故障描述</span><span>最近变化</span><span>操作</span></div>
+          <div className="fp-compact-list fp-alert-list">
             {page.records.length === 0 ? <div className="fp-empty">暂无故障记录</div> : null}
             {page.records.map((alert) => (
-              <div className={`fp-data-table__row ${selected?.id === alert.id ? 'is-selected' : ''}`} key={alert.id} onClick={() => openDetail(alert)}>
-                <strong>{alert.objectName || alert.objectCode || alert.alertKey}<em>{alert.objectType}</em></strong>
-                <span><Level value={alert.currentLevel} /></span>
-                <span>{alert.status === 'RECOVERED' ? '已关闭' : '活动中'}</span>
-                <span>{alert.message || '-'}</span>
-                <span>{formatTime(alert.lastChangedAt)}</span>
-                <div className="fp-actions">
+              <article className="fp-compact-row fp-compact-row--alert" key={alert.id} role="button" tabIndex={0} onClick={() => openDetail(alert)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openDetail(alert); }}>
+                <div className="fp-compact-row__identity"><strong>{alert.objectName || alert.objectCode || alert.alertKey}</strong><em>{alert.objectType || alert.alertKey}</em></div>
+                <div className="fp-compact-row__datum"><span>告警信息</span><strong>{alert.message || '-'}</strong></div>
+                <Level value={alert.currentLevel} />
+                <div className="fp-compact-row__datum"><span>闭环状态</span><strong>{alert.status === 'RECOVERED' ? '已关闭' : '活动中'}</strong></div>
+                <div className="fp-compact-row__datum"><span>最近变化</span><strong>{formatTime(alert.lastChangedAt)}</strong></div>
+                <div className="fp-compact-row__actions">
                   <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); openDetail(alert); }}>详情</button>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
           <Pagination pageNo={page.pageNo} pageSize={page.pageSize} total={page.total} onChange={(pageNo, pageSize) => setQuery({ ...query, pageNo, pageSize })} />
-        </div>
-
-        <aside className="fp-card fp-alert-side">
-          <div className="fp-threshold-side__head">
-            <h2>{selected?.objectName || '选择一条故障'}</h2>
-            <p>{selected?.message || '查看本次故障的触发、升级、恢复轨迹。'}</p>
-          </div>
-          {selected ? (
-            <>
-              <div className="fp-threshold-kv">
-                <div><span>当前级别</span><strong><Level value={selected.currentLevel} /></strong></div>
-                <div><span>前一等级</span><strong>{levelText(selected.previousLevel)}</strong></div>
-                <div><span>触发值</span><strong>{selected.triggerValue ?? '-'}</strong></div>
-                <div><span>首次触发</span><strong>{formatTime(selected.firstTriggeredAt)}</strong></div>
-                <div><span>确认状态</span><strong>{selected.acknowledged ? '已确认' : '未确认'}</strong></div>
-                <div><span>恢复时间</span><strong>{formatTime(selected.recoveredAt)}</strong></div>
-              </div>
-              <div className="fp-actions fp-side-section">
-                <button className="fp-button fp-button--primary" type="button" disabled={selected.acknowledged} onClick={acknowledge}>确认故障</button>
-              </div>
-              <div className="fp-alert-timeline">
-                {events.length === 0 ? <div className="fp-empty fp-empty--small">暂无故障过程记录</div> : null}
-                {events.map((event) => (
-                  <div className="fp-alert-timeline__item" key={event.id}>
-                    <strong>{levelText(event.fromLevel)} → {levelText(event.toLevel)}</strong>
-                    <span>{formatTime(event.eventAt)} · {event.message || event.eventType}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : <div className="fp-empty">暂无选中告警</div>}
-        </aside>
       </section>
       {toast ? <Toast {...toast} onClose={() => setToast(null)} /> : null}
     </div>
   );
+}
+
+function DetailDatum({ label, value, children }) {
+  return <div className="fp-alert-detail-datum"><span>{label}</span><strong>{children || value}</strong></div>;
+}
+
+function detailIdFromHash() {
+  const match = (window.location.hash || '').match(/^#\/?alert-center\/([^/?#]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
 }
 
 function Level({ value }) {
