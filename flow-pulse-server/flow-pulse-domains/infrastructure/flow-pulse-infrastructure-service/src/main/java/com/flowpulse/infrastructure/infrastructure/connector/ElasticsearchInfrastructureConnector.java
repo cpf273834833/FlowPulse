@@ -8,9 +8,16 @@ import java.util.List;
 
 @Component
 public class ElasticsearchInfrastructureConnector extends HttpInfrastructureConnectorSupport {
+    private static final int READ_TIMEOUT_MILLIS = 60000;
+
     @Override
     public boolean supports(String type) {
         return "ELASTICSEARCH".equalsIgnoreCase(type);
+    }
+
+    @Override
+    protected int readTimeoutMillis() {
+        return READ_TIMEOUT_MILLIS;
     }
 
     @Override

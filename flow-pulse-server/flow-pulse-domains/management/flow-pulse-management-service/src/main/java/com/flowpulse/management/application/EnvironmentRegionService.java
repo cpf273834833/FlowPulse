@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class EnvironmentRegionService {
+public class EnvironmentRegionService implements com.flowpulse.management.api.EnvironmentRegionQuery {
     private static final String REGION_MANAGEMENT = "MANAGEMENT";
     private static final String REGION_COMPUTE = "COMPUTE";
     private static final String STATUS_ENABLED = "ENABLED";

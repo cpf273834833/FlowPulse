@@ -65,5 +65,10 @@ public interface ResourceMetricConfigMapper {
                         @Param("nextCollectAt") long nextCollectAt,
                         @Param("updatedAt") long updatedAt);
 
+    int updateCurrentValue(@Param("tenantId") String tenantId,
+                           @Param("id") String id,
+                           @Param("value") double value,
+                           @Param("collectedAt") long collectedAt);
+
     int deleteById(@Param("tenantId") String tenantId, @Param("id") String id);
 }

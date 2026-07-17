@@ -12,6 +12,7 @@ public class ExecutorNodeResponse {
     private Integer sshPort;
     private String sshUsername;
     private String sshAuthType;
+    private Boolean credentialConfigured;
     private String javaHome;
     private String pythonPath;
     private String sourceType;
@@ -47,6 +48,8 @@ public class ExecutorNodeResponse {
     public void setSshUsername(String sshUsername) { this.sshUsername = sshUsername; }
     public String getSshAuthType() { return sshAuthType; }
     public void setSshAuthType(String sshAuthType) { this.sshAuthType = sshAuthType; }
+    public Boolean getCredentialConfigured() { return credentialConfigured; }
+    public void setCredentialConfigured(Boolean credentialConfigured) { this.credentialConfigured = credentialConfigured; }
     public String getJavaHome() { return javaHome; }
     public void setJavaHome(String javaHome) { this.javaHome = javaHome; }
     public String getPythonPath() { return pythonPath; }

@@ -21,7 +21,7 @@ import com.flowpulse.management.api.response.EnvironmentRegionPageResponse;
 import com.flowpulse.management.api.response.EnvironmentResponse;
 import com.flowpulse.management.api.response.PlatformConfigResponse;
 import com.flowpulse.management.api.response.RegionResponse;
-import com.flowpulse.management.application.EnvironmentRegionService;
+import com.flowpulse.management.api.EnvironmentRegionQuery;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,16 +42,16 @@ public class ExecutorNodeService {
     private static final String AGENT_UNKNOWN = "UNKNOWN";
 
     private final ExecutorNodeMapper executorNodeMapper;
-    private final EnvironmentRegionService environmentRegionService;
+    private final EnvironmentRegionQuery environmentRegionQuery;
     private final SshConnectionTester sshConnectionTester;
     private final OmpHostClient ompHostClient;
 
     public ExecutorNodeService(ExecutorNodeMapper executorNodeMapper,
-                               EnvironmentRegionService environmentRegionService,
+                               EnvironmentRegionQuery environmentRegionQuery,
                                SshConnectionTester sshConnectionTester,
                                OmpHostClient ompHostClient) {
         this.executorNodeMapper = executorNodeMapper;
-        this.environmentRegionService = environmentRegionService;
+        this.environmentRegionQuery = environmentRegionQuery;
         this.sshConnectionTester = sshConnectionTester;
         this.ompHostClient = ompHostClient;
     }
@@ -66,7 +66,7 @@ public class ExecutorNodeService {
                 tenantId, trim(query.getKeyword()), trim(query.getEnvId()), trim(query.getRegionId()),
                 trim(query.getSourceType()), trim(query.getConnectionStatus()));
 
-        EnvironmentRegionPageResponse regionPage = environmentRegionService.page(tenantId);
+        EnvironmentRegionPageResponse regionPage = environmentRegionQuery.page(tenantId);
         Map<String, EnvironmentResponse> environments = indexEnvironments(regionPage.getEnvironments());
         Map<String, RegionResponse> regions = indexRegions(regionPage.getRegions());
 
@@ -86,7 +86,7 @@ public class ExecutorNodeService {
 
     public ExecutorNodeResponse detail(String tenantId, String id) {
         ExecutorNodeEntity entity = requireNode(tenantId, id);
-        EnvironmentRegionPageResponse regionPage = environmentRegionService.page(tenantId);
+        EnvironmentRegionPageResponse regionPage = environmentRegionQuery.page(tenantId);
         return toResponse(entity, indexEnvironments(regionPage.getEnvironments()), indexRegions(regionPage.getRegions()));
     }
 
@@ -158,7 +158,7 @@ public class ExecutorNodeService {
         if (trim(regionId).length() == 0) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED, MessageKeys.EXECUTOR_NODE_REGION_REQUIRED);
         }
-        EnvironmentRegionPageResponse regionPage = environmentRegionService.page(tenantId);
+        EnvironmentRegionPageResponse regionPage = environmentRegionQuery.page(tenantId);
         RegionResponse region = findRegion(regionPage.getRegions(), regionId);
         PlatformConfigResponse config = findPlatformConfig(regionPage.getPlatformConfigs(), regionId);
         if (config == null || trim(config.getOmpBaseUrl()).length() == 0 || trim(config.getOmpApiKey()).length() == 0) {
@@ -302,6 +302,10 @@ public class ExecutorNodeService {
         response.setSshPort(entity.getSshPort());
         response.setSshUsername(entity.getSshUsername());
         response.setSshAuthType(entity.getSshAuthType());
+        response.setCredentialConfigured(Boolean.valueOf(
+                AUTH_PRIVATE_KEY.equals(entity.getSshAuthType())
+                        ? trim(entity.getSshPrivateKey()).length() > 0
+                        : trim(entity.getSshPassword()).length() > 0));
         response.setJavaHome(entity.getJavaHome());
         response.setPythonPath(entity.getPythonPath());
         response.setSourceType(entity.getSourceType());

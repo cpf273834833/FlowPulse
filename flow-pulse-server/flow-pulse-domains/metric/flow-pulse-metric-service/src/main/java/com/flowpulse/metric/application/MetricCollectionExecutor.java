@@ -179,6 +179,9 @@ public class MetricCollectionExecutor {
         sample.setMetadataJson(trim(point.getMetadataJson()).length() == 0 ? result.getMetadataJson() : point.getMetadataJson());
         sample.setCreatedAt(Long.valueOf(collectedAt));
         sampleMapper.insert(sample);
+        if (TOTAL_INSTANCE.equals(sample.getInstance()) && SERIES_AGGREGATE.equals(sample.getSeriesType())) {
+            configMapper.updateCurrentValue(task.getTenantId(), task.getId(), sample.getValue().doubleValue(), collectedAt);
+        }
     }
 
     private double primaryValue(List<MetricSeriesPoint> points) {

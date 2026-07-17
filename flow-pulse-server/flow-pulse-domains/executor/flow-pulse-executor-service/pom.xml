@@ -23,7 +23,7 @@
         </dependency>
         <dependency>
             <groupId>uyun.flowpulse</groupId>
-            <artifactId>flow-pulse-management-service</artifactId>
+            <artifactId>flow-pulse-management-api</artifactId>
         </dependency>
         <dependency>
             <groupId>uyun.flowpulse</groupId>

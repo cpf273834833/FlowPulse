@@ -87,7 +87,7 @@
             </includes>
         </fileSet>
         <fileSet>
-            <directory>D:\codex\FlowPulse\flow-pulse-fronted\build</directory>
+            <directory>${project.basedir}/../../../flow-pulse-fronted/build</directory>
             <outputDirectory>flowpulse-main/static</outputDirectory>
         </fileSet>
     </fileSets>

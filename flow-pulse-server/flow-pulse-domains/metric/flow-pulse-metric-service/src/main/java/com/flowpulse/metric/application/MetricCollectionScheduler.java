@@ -12,7 +12,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.PreDestroy;
 
 @Component
 public class MetricCollectionScheduler {
@@ -29,11 +35,15 @@ public class MetricCollectionScheduler {
                                      MetricCollectionExecutor collectionExecutor,
                                      MetricCatalogLifecycle catalogLifecycle,
                                      @Value("${flowpulse.metric.collection.worker-size:4}") int workerSize,
+                                     @Value("${flowpulse.metric.collection.queue-capacity:200}") int queueCapacity,
                                      @Value("${flowpulse.metric.collection.batch-size:50}") int batchSize) {
         this.configMapper = configMapper;
         this.collectionExecutor = collectionExecutor;
         this.catalogLifecycle = catalogLifecycle;
-        this.workerPool = Executors.newFixedThreadPool(Math.max(1, workerSize));
+        int workers = Math.max(1, workerSize);
+        this.workerPool = new ThreadPoolExecutor(workers, workers, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<Runnable>(Math.max(workers, queueCapacity)), new MetricThreadFactory(),
+                new ThreadPoolExecutor.AbortPolicy());
         this.batchSize = Math.max(1, batchSize);
     }
 
@@ -48,7 +58,8 @@ public class MetricCollectionScheduler {
             if (!inFlightTaskIds.add(task.getId())) {
                 continue;
             }
-            workerPool.submit(new Runnable() {
+            try {
+                workerPool.submit(new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -59,7 +70,29 @@ public class MetricCollectionScheduler {
                         inFlightTaskIds.remove(task.getId());
                     }
                 }
-            });
+                });
+            } catch (RejectedExecutionException exception) {
+                inFlightTaskIds.remove(task.getId());
+                LOGGER.warn("Metric collection queue is full; task will be retried. configId={}", task.getId());
+            }
+        }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        workerPool.shutdown();
+        try {
+            if (!workerPool.awaitTermination(10, TimeUnit.SECONDS)) workerPool.shutdownNow();
+        } catch (InterruptedException exception) {
+            workerPool.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static final class MetricThreadFactory implements ThreadFactory {
+        private final AtomicInteger sequence = new AtomicInteger();
+        @Override public Thread newThread(Runnable runnable) {
+            return new Thread(runnable, "flowpulse-metric-" + sequence.incrementAndGet());
         }
     }
 }

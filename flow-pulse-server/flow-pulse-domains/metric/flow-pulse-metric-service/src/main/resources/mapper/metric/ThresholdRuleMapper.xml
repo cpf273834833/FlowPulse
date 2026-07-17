@@ -107,10 +107,15 @@
         left join fp_metric_definition m on m.tenant_id = r.tenant_id and m.id = r.metric_definition_id
         where r.tenant_id = #{tenantId}
           and r.metric_definition_id = #{metricDefinitionId}
-          and r.object_type = #{objectType}
-          and r.object_id = #{objectId}
           and r.enabled = true
-          and r.scope_type in ('RESOURCE', 'TOPOLOGY_ELEMENT')
+          and (
+              r.scope_type = 'GLOBAL'
+              or (
+                  r.scope_type in ('RESOURCE', 'TOPOLOGY_ELEMENT')
+                  and r.object_type = #{objectType}
+                  and r.object_id = #{objectId}
+              )
+          )
         order by r.updated_at desc
     </select>
 

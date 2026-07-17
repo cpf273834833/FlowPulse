@@ -14,8 +14,8 @@ abstract class HttpInfrastructureConnectorSupport implements InfrastructureConne
         String base = normalizeBaseEndpoint(entity.getEndpoint());
         String url = base.endsWith("/") ? base.substring(0, base.length() - 1) + path : base + path;
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setConnectTimeout(10000);
-        connection.setReadTimeout(10000);
+        connection.setConnectTimeout(connectTimeoutMillis());
+        connection.setReadTimeout(readTimeoutMillis());
         connection.setRequestMethod("GET");
         if ("BASIC".equalsIgnoreCase(entity.getAuthType()) && notBlank(entity.getUsername())) {
             String token = entity.getUsername() + ":" + (entity.getPassword() == null ? "" : entity.getPassword());
@@ -37,6 +37,14 @@ abstract class HttpInfrastructureConnectorSupport implements InfrastructureConne
 
     protected boolean notBlank(String value) {
         return value != null && value.trim().length() > 0;
+    }
+
+    protected int connectTimeoutMillis() {
+        return 10000;
+    }
+
+    protected int readTimeoutMillis() {
+        return 10000;
     }
 
     private String normalizeBaseEndpoint(String endpoint) {
