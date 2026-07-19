@@ -9,6 +9,7 @@ import { environmentRegionApi } from '../../api/environmentRegionApi';
 import { executorNodeApi } from '../../api/executorNodeApi';
 import { metricApi } from '../../api/metricApi';
 import Pagination from '../../components/Pagination';
+import ManagementTable from '../../components/ManagementTable';
 import EnvironmentScopeTree from '../../components/EnvironmentScopeTree';
 import SelectControl from '../../components/SelectControl';
 import { StatCards } from '../../components/PageChrome';
@@ -55,7 +56,6 @@ export default function CollectionTaskPage() {
   const [executorNodes, setExecutorNodes] = useState([]);
   const [scope, setScope] = useState({ envId: '', regionId: '' });
   const [taskQuery, setTaskQuery] = useState({ pageNo: 1, pageSize: 10 });
-  const [selectedTaskId, setSelectedTaskId] = useState('');
   const [route, setRoute] = useState({ name: 'list' });
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
@@ -64,7 +64,6 @@ export default function CollectionTaskPage() {
   const metricIndex = useMemo(() => indexById(definitions), [definitions]);
   const implementationIndex = useMemo(() => indexById(implementations), [implementations]);
   const executorIndex = useMemo(() => indexById(executorNodes), [executorNodes]);
-  const selectedTask = tasks.configs.records.find((item) => item.id === selectedTaskId) || tasks.configs.records[0];
 
   useEffect(() => {
     loadBootstrap();
@@ -116,10 +115,6 @@ export default function CollectionTaskPage() {
       const data = await metricApi.resourceConfigPage(normalizeQuery(query));
       setTasks(data || EMPTY_TASK_PAGE);
       setTaskQuery(nextQuery);
-      const records = (((data || EMPTY_TASK_PAGE).configs || {}).records || []);
-      if (!records.some((item) => item.id === selectedTaskId)) {
-        setSelectedTaskId(records[0] ? records[0].id : '');
-      }
     } catch (error) {
       showMessage(error.message, 'error');
     }
@@ -133,7 +128,6 @@ export default function CollectionTaskPage() {
   function selectScope(nextScope) {
     setScope({ envId: nextScope.envId || '', regionId: nextScope.regionId || '' });
     setTaskQuery({ ...taskQuery, pageNo: 1 });
-    setSelectedTaskId('');
   }
 
   function openEdit(task) {
@@ -174,7 +168,7 @@ export default function CollectionTaskPage() {
   }
 
   if (route.name === 'detail') {
-    const detailTask = tasks.configs.records.find((item) => item.id === route.id) || selectedTask;
+    const detailTask = tasks.configs.records.find((item) => item.id === route.id);
     return (
       <TaskDetailPage
         task={detailTask}
@@ -260,35 +254,33 @@ export default function CollectionTaskPage() {
             </div>
           </div>
 
-          <div className="fp-compact-list">
-            {tasks.configs.records.map((task) => (
-              <div
-                className={`fp-compact-row fp-compact-row--task ${selectedTaskId === task.id ? 'is-selected' : ''}`}
-                role="button"
-                tabIndex={0}
-                key={task.id}
-                onClick={() => setSelectedTaskId(task.id)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    setSelectedTaskId(task.id);
-                  }
-                }}
-              >
-                <div className="fp-compact-row__identity"><strong>{task.objectName}</strong><em>{task.objectCode}</em></div>
-                <div className="fp-compact-row__metric"><span>{task.metricName || '-'}</span><strong>{formatMetricValue(task.currentValue)}</strong></div>
-                <div className="fp-compact-row__datum"><span>{t('metric.implementation')}</span><strong>{task.implementationName || t('metric.useDefaultImplementation')}</strong></div>
-                <div className="fp-compact-row__datum"><span>{t('metric.executionMode')}</span><strong>{executionLabel(task.executionMode)}</strong></div>
-                <div className="fp-compact-row__datum"><span>{t('metric.interval')}</span><strong>{task.intervalSec || '-'}s</strong></div>
-                <div className="fp-compact-row__datum"><span>{t('collectionTask.nextCollectAt')}</span><strong>{formatTime(task.nextCollectAt)}</strong></div>
-                <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />
-                <span className="fp-compact-row__actions" onClick={(event) => event.stopPropagation()}>
-                  <button type="button" onClick={() => setRoute({ name: 'detail', id: task.id })}>{t('detail')}</button>
-                  <button type="button" onClick={() => openEdit(task)}>{t('collectionTask.config')}</button>
-                </span>
-              </div>
-            ))}
-            {tasks.configs.records.length === 0 && <div className="fp-empty-row">{loading ? t('loading') : t('empty')}</div>}
-          </div>
+          <ManagementTable
+            columns={[
+              { key: 'object', label: '对象名称 / 编码', width: 'minmax(118px,1.1fr)' },
+              { key: 'metric', label: '指标 / 当前值', width: 'minmax(108px,.9fr)' },
+              { key: 'implementation', label: t('metric.implementation'), width: 'minmax(116px,1fr)' },
+              { key: 'execution', label: t('metric.executionMode'), width: '78px' },
+              { key: 'interval', label: t('metric.interval'), width: '58px' },
+              { key: 'next', label: t('collectionTask.nextCollectAt'), width: '114px' },
+              { key: 'status', label: '状态', width: '68px' },
+              { key: 'actions', label: '操作', width: '76px', align: 'right' },
+            ]}
+            rows={tasks.configs.records}
+            emptyText={loading ? t('loading') : t('empty')}
+            renderCells={(task) => [
+              <div className="fp-compact-row__identity"><strong>{task.objectName}</strong><em>{task.objectCode}</em></div>,
+              <div className="fp-compact-row__metric"><span>{task.metricName || '-'}</span><strong>{formatMetricValue(task.currentValue)}</strong></div>,
+              <strong>{task.implementationName || t('metric.useDefaultImplementation')}</strong>,
+              <strong>{executionLabel(task.executionMode)}</strong>,
+              <strong>{task.intervalSec || '-'}s</strong>,
+              <strong>{formatTime(task.nextCollectAt)}</strong>,
+              <StatusPill status={task.lastCollectStatus} enabled={task.enabled} />,
+              <span className="fp-compact-row__actions" onClick={(event) => event.stopPropagation()}>
+                <button type="button" onClick={() => setRoute({ name: 'detail', id: task.id })}>{t('detail')}</button>
+                <button type="button" onClick={() => openEdit(task)}>{t('collectionTask.config')}</button>
+              </span>,
+            ]}
+          />
           <Pagination
             pageNo={tasks.configs.pageNo}
             pageSize={tasks.configs.pageSize}

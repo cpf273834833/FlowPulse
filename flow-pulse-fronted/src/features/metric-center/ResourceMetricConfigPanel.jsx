@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import PlusOutlined from '@uyun/icons/PlusOutlined';
 import SearchOutlined from '@uyun/icons/SearchOutlined';
 import { metricApi } from '../../api/metricApi';
+import ManagementTable from '../../components/ManagementTable';
 import Pagination from '../../components/Pagination';
 import { t } from '../../i18n';
 
@@ -53,29 +54,29 @@ export default function ResourceMetricConfigPanel({ objectContext, metrics, impl
           <button className="fp-button" type="button" onClick={() => load({ ...query, pageNo: 1 })}>{t('filter')}</button>
         </div>
       ) : null}
-      <div className="fp-data-table fp-resource-metric-table">
-        <div className="fp-data-table__row fp-data-table__row--head">
-          <span>{t('metric.object')}</span>
-          <span>{t('metric.name')}</span>
-          <span>{t('metric.implementation')}</span>
-          <span>{t('metric.executionMode')}</span>
-          <span>{t('metric.interval')}</span>
-          <span>{t('metric.collectStatus')}</span>
-          <span>{t('operation')}</span>
-        </div>
-        {page.configs.records.length === 0 ? <div className="fp-empty">{t('empty')}</div> : null}
-        {page.configs.records.map((item) => (
-          <div className="fp-data-table__row" key={item.id}>
-            <span>{item.objectName}<em>{item.objectCode}</em></span>
-            <span>{item.metricName}<em>{item.metricCode}</em></span>
-            <span>{item.implementationName || '-'}</span>
-            <span>{labelExecution(item.executionMode)}</span>
-            <span>{item.intervalSec}s</span>
-            <span>{labelCollect(item.lastCollectStatus)}</span>
-            <button className="fp-link-button" type="button" onClick={() => setEditing(item)}>{t('edit')}</button>
-          </div>
-        ))}
-      </div>
+      <ManagementTable
+        className="fp-resource-metric-table"
+        columns={[
+          { key: 'object', label: t('metric.object'), width: 'minmax(150px, 1.1fr)' },
+          { key: 'metric', label: t('metric.name'), width: 'minmax(150px, 1.1fr)' },
+          { key: 'implementation', label: t('metric.implementation'), width: 'minmax(130px, 1fr)' },
+          { key: 'execution', label: t('metric.executionMode'), width: '100px' },
+          { key: 'interval', label: t('metric.interval'), width: '72px' },
+          { key: 'status', label: t('metric.collectStatus'), width: '96px' },
+          { key: 'actions', label: t('operation'), width: '64px', align: 'right' },
+        ]}
+        rows={page.configs.records}
+        emptyText={t('empty')}
+        renderCells={(item) => [
+          <span>{item.objectName}<em>{item.objectCode}</em></span>,
+          <span>{item.metricName}<em>{item.metricCode}</em></span>,
+          <span>{item.implementationName || '-'}</span>,
+          <span>{labelExecution(item.executionMode)}</span>,
+          <span>{item.intervalSec}s</span>,
+          <span>{labelCollect(item.lastCollectStatus)}</span>,
+          <button className="fp-link-button" type="button" onClick={() => setEditing(item)}>{t('edit')}</button>,
+        ]}
+      />
       <Pagination pageNo={page.configs.pageNo} pageSize={page.configs.pageSize} total={page.configs.total} onChange={(next) => load({ ...query, ...next })} />
       {editing ? <ResourceMetricConfigEditor form={editing} metrics={metrics} implementations={implementations} onCancel={() => setEditing(null)} onSubmit={save} /> : null}
     </section>

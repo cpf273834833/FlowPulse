@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { alertApi } from '../../api/alertApi';
 import Pagination from '../../components/Pagination';
+import ManagementTable from '../../components/ManagementTable';
 import SelectControl from '../../components/SelectControl';
 import { StatIcon } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
@@ -162,21 +163,20 @@ export default function AlertCenterPage() {
             <button className="fp-button" type="button" onClick={search}>筛选</button>
           </div>
 
-          <div className="fp-compact-list fp-alert-list">
-            {page.records.length === 0 ? <div className="fp-empty">暂无故障记录</div> : null}
-            {page.records.map((alert) => (
-              <article className="fp-compact-row fp-compact-row--alert" key={alert.id} role="button" tabIndex={0} onClick={() => openDetail(alert)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openDetail(alert); }}>
-                <div className="fp-compact-row__identity"><strong>{alert.objectName || alert.objectCode || alert.alertKey}</strong><em>{alert.objectType || alert.alertKey}</em></div>
-                <div className="fp-compact-row__datum"><span>告警信息</span><strong>{alert.message || '-'}</strong></div>
-                <Level value={alert.currentLevel} />
-                <div className="fp-compact-row__datum"><span>闭环状态</span><strong>{alert.status === 'RECOVERED' ? '已关闭' : '活动中'}</strong></div>
-                <div className="fp-compact-row__datum"><span>最近变化</span><strong>{formatTime(alert.lastChangedAt)}</strong></div>
+          <ManagementTable className="fp-alert-list" columns={[
+            { key: 'object', label: '告警对象 / 类型', width: 'minmax(150px,1fr)' }, { key: 'message', label: '告警信息', width: 'minmax(220px,1.5fr)' },
+            { key: 'level', label: '级别', width: '72px' }, { key: 'status', label: '闭环状态', width: '72px' },
+            { key: 'changed', label: '最近变化', width: '140px' }, { key: 'actions', label: '操作', width: '44px', align: 'right' },
+          ]} rows={page.records} onRowClick={openDetail} emptyText="暂无故障记录" renderCells={(alert) => [
+                <div className="fp-compact-row__identity"><strong>{alert.objectName || alert.objectCode || alert.alertKey}</strong><em>{alert.objectType || alert.alertKey}</em></div>,
+                <strong>{alert.message || '-'}</strong>,
+                <Level value={alert.currentLevel} />,
+                <strong>{alert.status === 'RECOVERED' ? '已关闭' : '活动中'}</strong>,
+                <strong>{formatTime(alert.lastChangedAt)}</strong>,
                 <div className="fp-compact-row__actions">
                   <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); openDetail(alert); }}>详情</button>
-                </div>
-              </article>
-            ))}
-          </div>
+                </div>,
+          ]} />
           <Pagination pageNo={page.pageNo} pageSize={page.pageSize} total={page.total} onChange={(pageNo, pageSize) => setQuery({ ...query, pageNo, pageSize })} />
       </section>
       {toast ? <Toast {...toast} onClose={() => setToast(null)} /> : null}

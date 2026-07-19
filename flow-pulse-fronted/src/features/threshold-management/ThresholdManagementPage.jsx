@@ -3,6 +3,7 @@ import { thresholdApi } from '../../api/thresholdApi';
 import { metricApi } from '../../api/metricApi';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
+import ManagementTable from '../../components/ManagementTable';
 import SelectControl from '../../components/SelectControl';
 import { SecondaryPage, StatIcon } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
@@ -105,7 +106,6 @@ export default function ThresholdManagementPage() {
       const rules = response.rules || { records: [], total: 0, pageNo: nextQuery.pageNo, pageSize: nextQuery.pageSize };
       setPage(rules);
       setStats(response.stats || []);
-      setSelected((current) => current || rules.records[0] || null);
     } finally {
       setLoading(false);
     }
@@ -283,24 +283,22 @@ export default function ThresholdManagementPage() {
             <button className="fp-button" type="button" onClick={search}>筛选</button>
           </div>
 
-          <div className="fp-compact-list">
-            {loading ? <div className="fp-empty">加载中...</div> : null}
-            {!loading && page.records.length === 0 ? <div className="fp-empty">暂无阈值规则</div> : null}
-            {page.records.map((rule) => (
-              <article className={`fp-compact-row fp-compact-row--threshold ${selected?.id === rule.id ? 'is-selected' : ''}`} key={rule.id} role="button" tabIndex={0} onClick={() => openDetail(rule)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openDetail(rule); }}>
-                <div className="fp-compact-row__identity"><strong>{rule.ruleName}</strong><em>{rule.ruleCode}</em></div>
-                <div className="fp-compact-row__datum"><span>指标</span><strong>{rule.metricName || rule.metricCode || '-'}</strong></div>
-                <div className="fp-compact-row__datum"><span>作用范围</span><strong>{scopeText(rule.scopeType)}</strong></div>
-                <div className="fp-compact-row__datum"><span>对象</span><strong>{rule.objectName || rule.objectCode || rule.topologyElementId || '全局'}</strong></div>
-                <span className={`fp-status-text ${rule.enabled ? 'fp-status-text--normal' : ''}`}>{rule.enabled ? '启用' : '停用'}</span>
+          <ManagementTable columns={[
+            { key: 'rule', label: '规则名称 / 编码', width: 'minmax(180px,1.35fr)' }, { key: 'metric', label: '指标', width: 'minmax(150px,1.1fr)' },
+            { key: 'scope', label: '作用范围', width: '90px' }, { key: 'object', label: '对象', width: 'minmax(130px,1fr)' },
+            { key: 'status', label: '状态', width: '68px' }, { key: 'actions', label: '操作', width: '156px', align: 'right' },
+          ]} rows={loading ? [] : page.records} onRowClick={openDetail} emptyText={loading ? '加载中...' : '暂无阈值规则'} renderCells={(rule) => [
+                <div className="fp-compact-row__identity"><strong>{rule.ruleName}</strong><em>{rule.ruleCode}</em></div>,
+                <strong>{rule.metricName || rule.metricCode || '-'}</strong>,
+                <strong>{scopeText(rule.scopeType)}</strong>,
+                <strong>{rule.objectName || rule.objectCode || rule.topologyElementId || '全局'}</strong>,
+                <span className={`fp-status-text ${rule.enabled ? 'fp-status-text--normal' : ''}`}>{rule.enabled ? '启用' : '停用'}</span>,
                 <div className="fp-compact-row__actions">
                   <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); openDetail(rule); }}>详情</button>
                   <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); openEdit(rule); }}>编辑</button>
                   <button className="fp-link-button fp-link-button--danger" type="button" onClick={(event) => { event.stopPropagation(); requestDelete(rule); }}>删除</button>
-                </div>
-              </article>
-            ))}
-          </div>
+                </div>,
+          ]} />
           <Pagination pageNo={page.pageNo} pageSize={page.pageSize} total={page.total} onChange={(pageNo, pageSize) => setQuery({ ...query, pageNo, pageSize })} />
         </div>
       </section>

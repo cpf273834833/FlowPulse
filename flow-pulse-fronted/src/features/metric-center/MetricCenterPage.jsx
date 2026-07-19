@@ -4,6 +4,7 @@ import PlusOutlined from '@uyun/icons/PlusOutlined';
 import SearchOutlined from '@uyun/icons/SearchOutlined';
 import { metricApi } from '../../api/metricApi';
 import Pagination from '../../components/Pagination';
+import ManagementTable from '../../components/ManagementTable';
 import SelectControl from '../../components/SelectControl';
 import { StatIcon } from '../../components/PageChrome';
 import Toast from '../../components/Toast';
@@ -65,15 +66,14 @@ export default function MetricCenterPage() {
   const [implementationQuery, setImplementationQuery] = useState({ pageNo: 1, pageSize: 10 });
   const [selectedDefinitionId, setSelectedDefinitionId] = useState('');
   const [selectedImplementationId, setSelectedImplementationId] = useState('');
-  const [selectedImplementations, setSelectedImplementations] = useState([]);
   const [metricContext, setMetricContext] = useState(null);
   const [message, setMessage] = useState('');
   const [route, setRoute] = useState({ type: 'list' });
 
   const metrics = definitionPage.metrics.records;
   const implementations = implementationPage.implementations.records;
-  const selectedDefinition = useMemo(() => metrics.find((item) => item.id === selectedDefinitionId) || metrics[0], [metrics, selectedDefinitionId]);
-  const selectedImplementation = useMemo(() => implementations.find((item) => item.id === selectedImplementationId) || implementations[0], [implementations, selectedImplementationId]);
+  const selectedDefinition = useMemo(() => metrics.find((item) => item.id === selectedDefinitionId) || null, [metrics, selectedDefinitionId]);
+  const selectedImplementation = useMemo(() => implementations.find((item) => item.id === selectedImplementationId) || null, [implementations, selectedImplementationId]);
 
   useEffect(() => {
     const preset = readTopologyMetricPrefill();
@@ -98,33 +98,6 @@ export default function MetricCenterPage() {
     const timer = window.setTimeout(() => setMessage(''), 3000);
     return () => window.clearTimeout(timer);
   }, [message]);
-
-  useEffect(() => {
-    if (selectedDefinition && !selectedDefinitionId) {
-      setSelectedDefinitionId(selectedDefinition.id);
-    }
-  }, [selectedDefinition, selectedDefinitionId]);
-
-  useEffect(() => {
-    if (selectedImplementation && !selectedImplementationId) {
-      setSelectedImplementationId(selectedImplementation.id);
-    }
-  }, [selectedImplementation, selectedImplementationId]);
-
-  useEffect(() => {
-    if (!selectedDefinition || activeTab !== 'definition') {
-      return undefined;
-    }
-    let active = true;
-    metricApi.implementationPage({ metricDefinitionId: selectedDefinition.id, pageNo: 1, pageSize: 20 })
-      .then((data) => {
-        if (active) {
-          setSelectedImplementations((data.implementations && data.implementations.records) || []);
-        }
-      })
-      .catch((error) => active && setMessage(error.message));
-    return () => { active = false; };
-  }, [selectedDefinition && selectedDefinition.id, activeTab]);
 
   async function loadDefinitions(nextQuery = definitionQuery) {
     try {
@@ -242,6 +215,15 @@ export default function MetricCenterPage() {
 }
 
 function DefinitionList({ page, query, selectedId, onQuery, onLoad, onSelect, onOpen }) {
+  const columns = [
+    { key: 'identity', label: '指标名称 / 编码', width: 'minmax(180px,1.5fr)' },
+    { key: 'tags', label: '分类 / 对象', width: 'minmax(130px,.9fr)' },
+    { key: 'unit', label: t('metric.unit'), width: '70px' },
+    { key: 'implementations', label: t('metric.implementationCount'), width: '76px' },
+    { key: 'mapping', label: t('metric.mappingStatus'), width: '105px' },
+    { key: 'status', label: '来源 / 状态', width: '72px' },
+    { key: 'actions', label: '操作', width: '46px', align: 'right' },
+  ];
   return (
     <>
       <div className="fp-filter-row fp-filter-row--metric fp-metric-filter">
@@ -251,26 +233,30 @@ function DefinitionList({ page, query, selectedId, onQuery, onLoad, onSelect, on
         <SelectBare value={query.enabled || ''} options={ENABLED_OPTIONS} onChange={(enabled) => onQuery({ ...query, enabled, pageNo: 1 })} />
         <button className="fp-button" type="button" onClick={() => onLoad({ ...query, pageNo: 1 })}>{t('filter')}</button>
       </div>
-      <div className="fp-compact-list">
-        {page.metrics.records.length === 0 ? <div className="fp-empty">{t('empty')}</div> : null}
-        {page.metrics.records.map((metric) => (
-          <article className={`fp-compact-row fp-compact-row--metric ${selectedId === metric.id ? 'is-selected' : ''}`} key={metric.id} role="button" tabIndex={0} onClick={() => onSelect(metric.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelect(metric.id); }}>
-            <button className="fp-compact-row__identity fp-node-link" type="button" onClick={(event) => { event.stopPropagation(); onOpen(metric); }}>{metric.metricName}<em>{metric.metricCode}</em></button>
-            <div className="fp-compact-row__tags"><Tag>{labelOf(CATEGORY_OPTIONS, metric.metricCategory)}</Tag><Tag muted>{labelOf(OBJECT_TYPE_OPTIONS, metric.objectType)}</Tag></div>
-            <CompactDatum label={t('metric.unit')} value={metric.valueUnit || '-'} />
-            <CompactDatum label={t('metric.implementationCount')} value={metric.implementationCount || 0} />
-            <div className="fp-compact-row__datum"><span>{t('metric.mappingStatus')}</span><MappingPill mapped={hasMapping(metric)} /></div>
-            <div className="fp-compact-row__status">{metric.systemBuiltin ? <Tag success>内置</Tag> : <StatusPill enabled={metric.enabled} />}</div>
-            <div className="fp-compact-row__actions"><button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); onOpen(metric); }}>{t('detail')}</button></div>
-          </article>
-        ))}
-      </div>
+      <ManagementTable columns={columns} rows={page.metrics.records} selectedKey={selectedId} onRowClick={(metric) => onSelect(metric.id)} emptyText={t('empty')} renderCells={(metric) => [
+        <button className="fp-compact-row__identity fp-node-link" type="button" onClick={(event) => { event.stopPropagation(); onOpen(metric); }}>{metric.metricName}<em>{metric.metricCode}</em></button>,
+        <div className="fp-compact-row__tags"><Tag>{labelOf(CATEGORY_OPTIONS, metric.metricCategory)}</Tag><Tag muted>{labelOf(OBJECT_TYPE_OPTIONS, metric.objectType)}</Tag></div>,
+        <strong>{metric.valueUnit || '-'}</strong>,
+        <strong>{metric.implementationCount || 0}</strong>,
+        <MappingPill mapped={hasMapping(metric)} />,
+        metric.systemBuiltin ? <Tag success>内置</Tag> : <StatusPill enabled={metric.enabled} />,
+        <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); onOpen(metric); }}>{t('detail')}</button>,
+      ]} />
       <Pagination pageNo={page.metrics.pageNo} pageSize={page.metrics.pageSize} total={page.metrics.total} onChange={(next) => onLoad({ ...query, ...next })} />
     </>
   );
 }
 
 function ImplementationList({ page, metrics, query, selectedId, onQuery, onLoad, onSelect, onOpen }) {
+  const columns = [
+    { key: 'identity', label: '实现名称 / 编码', width: 'minmax(170px,1.35fr)' },
+    { key: 'metric', label: t('metric.name'), width: 'minmax(150px,1.2fr)' },
+    { key: 'type', label: t('metric.implType'), width: 'minmax(110px,.8fr)' },
+    { key: 'execution', label: t('metric.executionMode'), width: '90px' },
+    { key: 'default', label: t('metric.defaultImplementation'), width: '82px' },
+    { key: 'status', label: '来源 / 状态', width: '72px' },
+    { key: 'actions', label: '操作', width: '46px', align: 'right' },
+  ];
   return (
     <>
       <div className="fp-filter-row fp-filter-row--metric fp-metric-filter">
@@ -280,27 +266,18 @@ function ImplementationList({ page, metrics, query, selectedId, onQuery, onLoad,
         <SelectBare value={query.enabled || ''} options={ENABLED_OPTIONS} onChange={(enabled) => onQuery({ ...query, enabled, pageNo: 1 })} />
         <button className="fp-button" type="button" onClick={() => onLoad({ ...query, pageNo: 1 })}>{t('filter')}</button>
       </div>
-      <div className="fp-compact-list">
-        {page.implementations.records.length === 0 ? <div className="fp-empty">{t('empty')}</div> : null}
-        {page.implementations.records.map((item) => (
-          <article className={`fp-compact-row fp-compact-row--implementation ${selectedId === item.id ? 'is-selected' : ''}`} key={item.id} role="button" tabIndex={0} onClick={() => onSelect(item.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelect(item.id); }}>
-            <button className="fp-compact-row__identity fp-node-link" type="button" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.implementationName}<em>{item.implementationCode}</em></button>
-            <CompactDatum label={t('metric.name')} value={`${item.metricName || '-'} / ${item.metricCode || '-'}`} />
-            <CompactDatum label={t('metric.implType')} value={labelOf(IMPLEMENTATION_TYPE_OPTIONS, item.implementationType)} />
-            <CompactDatum label={t('metric.executionMode')} value={item.executionMode} />
-            <CompactDatum label={t('metric.defaultImplementation')} value={item.defaultImplementation ? t('yes') : t('no')} />
-            <div className="fp-compact-row__status">{item.systemBuiltin ? <Tag success>内置</Tag> : <StatusPill enabled={item.enabled} />}</div>
-            <div className="fp-compact-row__actions"><button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{t('detail')}</button></div>
-          </article>
-        ))}
-      </div>
+      <ManagementTable columns={columns} rows={page.implementations.records} selectedKey={selectedId} onRowClick={(item) => onSelect(item.id)} emptyText={t('empty')} renderCells={(item) => [
+        <button className="fp-compact-row__identity fp-node-link" type="button" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.implementationName}<em>{item.implementationCode}</em></button>,
+        <strong>{item.metricName || '-'} / {item.metricCode || '-'}</strong>,
+        <strong>{labelOf(IMPLEMENTATION_TYPE_OPTIONS, item.implementationType)}</strong>,
+        <strong>{item.executionMode}</strong>,
+        <strong>{item.defaultImplementation ? t('yes') : t('no')}</strong>,
+        item.systemBuiltin ? <Tag success>内置</Tag> : <StatusPill enabled={item.enabled} />,
+        <button className="fp-link-button" type="button" onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{t('detail')}</button>,
+      ]} />
       <Pagination pageNo={page.implementations.pageNo} pageSize={page.implementations.pageSize} total={page.implementations.total} onChange={(next) => onLoad({ ...query, ...next })} />
     </>
   );
-}
-
-function CompactDatum({ label, value }) {
-  return <div className="fp-compact-row__datum"><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function MetricContextPanel({ activeTab, metric, implementation, implementations, onDetailMetric, onEditMetric, onDetailImplementation, onEditImplementation, onAddImplementation }) {

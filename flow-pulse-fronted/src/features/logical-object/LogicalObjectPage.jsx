@@ -132,10 +132,6 @@ export default function LogicalObjectPage() {
     const response = await logicalObjectApi.page(nextQuery);
     setPage(response || { records: [], total: 0, pageNo: nextQuery.pageNo, pageSize: nextQuery.pageSize });
     setQuery(nextQuery);
-    if (!selected && response?.records?.length) {
-      setSelected(response.records[0]);
-      loadInstances(response.records[0].id, instanceQuery);
-    }
   }
 
   async function loadInstances(id = selected?.id, nextQuery = instanceQuery) {
@@ -321,7 +317,7 @@ export default function LogicalObjectPage() {
           </div>
           <div className="fp-logical-card-grid">
             {page.records.map((item) => (
-              <article className={`fp-logical-card ${selected?.id === item.id ? 'is-active' : ''}`} key={item.id}>
+              <article className="fp-logical-card" key={item.id}>
                 <button type="button" onClick={() => openEdit(item)}>
                   <div><strong>{item.objectName}</strong><span>{item.objectCode}</span></div>
                   <em>{labelOf(OBJECT_TYPES, item.objectType)}</em>
